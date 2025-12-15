@@ -3,9 +3,9 @@
  * MSW와 React Query가 정상 작동하는지 확인
  */
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/Card";
+import { Badge } from "@/components/ui/Badge";
+import { Button } from "@/components/ui/Button";
 import { CheckCircle2, Server, Database, Zap } from "lucide-react";
 
 export function DemoSimplePage() {

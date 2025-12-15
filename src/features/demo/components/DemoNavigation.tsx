@@ -6,8 +6,8 @@
 // @ts-nocheck
 import { Link, useLocation } from "react-router-dom";
 import { Presentation, MessageSquare, Settings, FileText } from "lucide-react";
-import { Card } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { Card } from "@/components/ui/Card";
+import { Badge } from "@/components/ui/Badge";
 import { cn } from "@/lib/utils";
 
 const demoLinks = [

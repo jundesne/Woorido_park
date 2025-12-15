@@ -28,7 +28,7 @@ export default function ExplorePage() {
                 : "bg-surface-1 text-content-secondary border border-surface-border"
             }`}
           >
-            {status === "all" ? t("all") : tGye(`status.${status}`)}
+            {status === "all" ? t("all") : tGye(`status.${status}` as any)}
           </button>
         ))}
       </div>

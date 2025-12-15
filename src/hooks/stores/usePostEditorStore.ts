@@ -21,7 +21,7 @@ export interface PostEditorState {
   addMedia: (media: MediaUploadResponse) => void;
   removeMedia: (mediaId: string) => void;
   setQuotedPostId: (postId?: string) => void;
-  setUploadProgress: (progress: number) => void;
+  setUploadProgress: (progress: number | ((prev: number) => number)) => void;
   setIsUploading: (isUploading: boolean) => void;
   reset: () => void;
 }
@@ -51,7 +51,10 @@ export const usePostEditorStore = create<PostEditorState>((set) => ({
 
   setQuotedPostId: (postId) => set({ quotedPostId: postId }),
 
-  setUploadProgress: (progress) => set({ uploadProgress: progress }),
+  setUploadProgress: (progress) =>
+    set((state) => ({
+      uploadProgress: typeof progress === "function" ? progress(state.uploadProgress) : progress,
+    })),
 
   setIsUploading: (isUploading) => set({ isUploading }),
 
