@@ -3,7 +3,7 @@ import { http, HttpResponse, delay } from "msw";
 import { FeedTimeline } from "./FeedTimeline";
 import type { Post, PostListResponse } from "@/types/post";
 import type { Announcement, AnnouncementListResponse } from "@/types/announcement";
-import { BrowserRouter } from "react-router-dom";
+import { MemoryRouter } from "react-router-dom";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8080";
 
@@ -23,11 +23,11 @@ const meta: Meta<typeof FeedTimeline> = {
   tags: ["autodocs"],
   decorators: [
     (Story) => (
-      <BrowserRouter>
+      <MemoryRouter>
         <div className="max-w-2xl mx-auto min-h-screen">
           <Story />
         </div>
-      </BrowserRouter>
+      </MemoryRouter>
     ),
   ],
   parameters: {

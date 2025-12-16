@@ -2,7 +2,7 @@ import type { Meta, StoryObj } from "@storybook/react";
 import { http, HttpResponse, delay } from "msw";
 import { MediaUploader } from "./MediaUploader";
 import type { MediaUploadResponse } from "@/types/post";
-import { BrowserRouter } from "react-router-dom";
+import { MemoryRouter } from "react-router-dom";
 import { useEffect } from "react";
 import { usePostEditorStore } from "@/hooks/stores";
 
@@ -31,11 +31,11 @@ const meta: Meta<typeof MediaUploader> = {
       }, []);
 
       return (
-        <BrowserRouter>
+        <MemoryRouter>
           <div className="max-w-2xl mx-auto p-4">
             <Story />
           </div>
-        </BrowserRouter>
+        </MemoryRouter>
       );
     },
   ],
@@ -280,11 +280,11 @@ export const WithExistingMedia: Story = {
       }, []);
 
       return (
-        <BrowserRouter>
+        <MemoryRouter>
           <div className="max-w-2xl mx-auto p-4">
             <Story />
           </div>
-        </BrowserRouter>
+        </MemoryRouter>
       );
     },
   ],
@@ -337,11 +337,11 @@ export const MaxFilesReached: Story = {
       }, []);
 
       return (
-        <BrowserRouter>
+        <MemoryRouter>
           <div className="max-w-2xl mx-auto p-4">
             <Story />
           </div>
-        </BrowserRouter>
+        </MemoryRouter>
       );
     },
   ],
@@ -386,11 +386,11 @@ export const LargeFiles: Story = {
       }, []);
 
       return (
-        <BrowserRouter>
+        <MemoryRouter>
           <div className="max-w-2xl mx-auto p-4">
             <Story />
           </div>
-        </BrowserRouter>
+        </MemoryRouter>
       );
     },
   ],
@@ -450,11 +450,11 @@ export const MixedMedia: Story = {
       }, []);
 
       return (
-        <BrowserRouter>
+        <MemoryRouter>
           <div className="max-w-2xl mx-auto p-4">
             <Story />
           </div>
-        </BrowserRouter>
+        </MemoryRouter>
       );
     },
   ],

@@ -2,7 +2,7 @@ import type { Meta, StoryObj } from "@storybook/react";
 import { http, HttpResponse, delay } from "msw";
 import { CommentList } from "./CommentList";
 import type { Comment, CommentListResponse } from "@/types/comment";
-import { BrowserRouter } from "react-router-dom";
+import { MemoryRouter } from "react-router-dom";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8080";
 
@@ -22,11 +22,11 @@ const meta: Meta<typeof CommentList> = {
   tags: ["autodocs"],
   decorators: [
     (Story) => (
-      <BrowserRouter>
+      <MemoryRouter>
         <div className="max-w-2xl mx-auto p-4">
           <Story />
         </div>
-      </BrowserRouter>
+      </MemoryRouter>
     ),
   ],
   parameters: {
