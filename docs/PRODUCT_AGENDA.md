@@ -45,17 +45,36 @@
 
 ## [1] Vision & Core Value
 
+### 핵심 미션 🌟
+> **"고객 수입·지출 데이터 분석 기반 지역 계모임 운영 솔루션 구축"**
+> — KH정보교육원 Python & Elasticsearch 기반 금융 솔루션 개발자 아카데미
+
 ### Vision (장기)
 **"기술로 신뢰를 보증하는 가장 안전한 취향 공동체"**
 
 폐쇄형 커뮤니티의 오프라인 활동에 투명한 금융 인프라를 제공하여, 사람들이 **'돈 걱정 없이 취향으로 연결'**되는 세상을 만듭니다.
 
 ### Demo Day Value Proposition
-**"모임통장 걱정 끝, 1원까지 투명한 우리의 장부"**
+**"당신의 재정 상황에 맞는 완벽한 계모임을 찾아드립니다"**
 
-**🔺 신뢰 트라이포드 (Trust Tripod) + Elasticsearch = 4대 코어**
+**핵심 차별화:**
+```
+기존 서비스:  통장 개설 → 돈 모으기 → 문제 발생 시 대응 (Reactive)
+WOORIDO:     고객 재정 분석 → 신뢰 검증 → 맞춤 매칭 → 투명 운영 (Proactive)
+```
+
+**🔺 고객 재정 분석 기반 + 신뢰 트라이포드 + Elasticsearch = 5대 코어**
 
 ```
+              [핵심 미션: 고객 재정 분석]
+                       ⬇️
+    ┌─────────────────────────────────────────────┐
+    │  💰 재정 프로필 분석 (Django + pandas)       │
+    │  - 월 수입/지출/저축가능액 분석               │
+    │  - 적정 납입금 추천                          │
+    │  - 재정 건전성 점수 산출                     │
+    └─────────────────────────────────────────────┘
+                       ⬇️
               [신뢰 트라이포드]
                     △
                    /|\
@@ -70,15 +89,17 @@
          +
     ┌─────────────────────────────────┐
     │  🔍 Elasticsearch 취향 검색     │
+    │  + 재정 적합성 필터              │
     │  "Rate(이자)보다 Taste(취향)"   │
     └─────────────────────────────────┘
 ```
 
-**4대 코어 기능:**
-1. **🔒 선충전 락 (Deposit Lock)**: 보증금 선입금으로 신뢰 확보 (Mock)
-2. **📊 장부 투명화 (Open Ledger)**: Recharts 시각화 + Django 데이터 분석
-3. **🗳️ 결제 감시 다각화 (Consensus Pay)**: 투표 기반 지출 승인 시스템
-4. **🔍 취향 검색 (Taste Search)**: Elasticsearch 태그/텍스트/카테고리 검색
+**5대 코어 기능:**
+1. **💰 재정 분석 (Financial Analysis)**: Django pandas로 고객 수입/지출 분석, 적정 납입금 추천 🌟 **핵심 미션**
+2. **🔒 선충전 락 (Deposit Lock)**: 보증금 선입금으로 신뢰 확보 (Mock)
+3. **📊 장부 투명화 (Open Ledger)**: Recharts 시각화 + Django 데이터 분석
+4. **🗳️ 결제 감시 다각화 (Consensus Pay)**: 투표 기반 지출 승인 시스템
+5. **🔍 취향 검색 (Taste Search)**: Elasticsearch 태그/텍스트/카테고리 + 재정 필터
 
 ---
 
@@ -201,7 +222,113 @@ Desktop: 1920 x 1080px
 
 ---
 
-### 데이터 흐름 예시: "이번 달 지출 통계 조회"
+### 데이터 흐름 예시 1: "회원가입 후 재정 프로필 설정" 🌟 핵심 미션
+
+```
+1. 사용자: 온보딩 화면에서 재정 정보 입력
+   - 월 수입: 350만원
+   - 월 지출: 280만원
+   - 월 저축 가능액: 70만원
+   - 희망 월 납입금: 10만원
+
+2. Frontend → Spring Boot
+   POST /api/users/{userId}/financial-profile
+   Body: {
+     "monthlyIncome": 3500000,
+     "monthlyExpense": 2800000,
+     "savingsCapacity": 700000,
+     "desiredContribution": 100000
+   }
+
+3. Spring Boot → Django API 호출 (분석 요청)
+   POST http://django:8000/api/analyze/financial-profile
+   Body: {
+     "income": 3500000,
+     "expense": 2800000,
+     "savingsCapacity": 700000
+   }
+
+4. Django: pandas로 재정 분석
+   savings_rate = 700000 / 3500000 = 20%
+   health_score = (20% / 25%) × 100 = 80점
+   appropriate_contribution = 700000 × 0.15 = 105,000원
+   risk_level = "medium"
+
+5. Django → Spring Boot 응답
+   {
+     "appropriateContribution": 105000,
+     "financialHealthScore": 80.0,
+     "riskLevel": "medium",
+     "savingsRate": 20.0,
+     "analysis": "재정 건전성이 보통입니다 (80점)"
+   }
+
+6. Spring Boot: Oracle에 저장
+   - user_financial_profiles 테이블 UPSERT
+   - user_trust_scores 테이블 업데이트 (재정건전성 점수)
+
+7. Spring Boot → Frontend 응답
+   {
+     "profile": { ... },
+     "analysis": { "appropriateContribution": 105000, ... }
+   }
+
+8. Frontend: 분석 결과 표시
+   - "당신의 적정 월 납입금: 10.5만원"
+   - "재정 건전성 점수: 80점 (보통)"
+   - "적합한 계모임을 찾아보세요!" 버튼
+```
+
+---
+
+### 데이터 흐름 예시 2: "계모임 추천 받기"
+
+```
+1. 사용자: 계모임 검색 페이지에서 "추천 받기" 클릭
+
+2. Frontend → Spring Boot
+   GET /api/gyes/recommendations?userId={userId}&tags=독서,문화
+
+3. Spring Boot: 사용자 재정 프로필 조회
+   SELECT * FROM user_financial_profiles WHERE user_id = ?
+   SELECT * FROM user_trust_scores WHERE user_id = ?
+
+4. Spring Boot → Elasticsearch 검색 (취향 매칭)
+   GET /gyes/_search
+   { "query": { "terms": { "tags": ["독서", "문화"] } } }
+
+5. Spring Boot → Django API 호출 (매칭 분석)
+   POST http://django:8000/api/analyze/gye-recommendation
+   Body: {
+     "userProfile": { "appropriateContribution": 105000, "trustScore": 82 },
+     "availableGyes": [ /* Elasticsearch 결과 */ ]
+   }
+
+6. Django: pandas로 매칭 점수 계산
+   각 계모임별로:
+   - 재정 적합성 (40%): 납입금 차이 기반
+   - 취향 일치율 (35%): 태그 교집합
+   - 신뢰 유사도 (25%): 점수 차이
+
+7. Django → Spring Boot 응답
+   {
+     "recommendations": [
+       { "gyeId": "gye-1", "matchScore": 92, "reasons": [...] },
+       { "gyeId": "gye-2", "matchScore": 78, "reasons": [...] }
+     ]
+   }
+
+8. Spring Boot → Frontend 응답
+   (매칭 점수 순으로 정렬하여 전달)
+
+9. Frontend: 추천 계모임 카드 리스트 표시
+   - "책벌레들 (92% 매칭) - 적정 납입금 범위 내"
+   - "영화광들 (78% 매칭) - 여유 있는 납입금"
+```
+
+---
+
+### 데이터 흐름 예시 3: "이번 달 지출 통계 조회"
 
 ```
 1. 사용자: 장부 페이지에서 "통계 보기" 버튼 클릭
@@ -414,15 +541,38 @@ public void castVote(Long expenseId, boolean approve) { ... }
 
 ## [3] Demo Day MVP (시연 필수 기능)
 
-### 시연 시나리오 (5분 라이브 데모)
+### 시연 시나리오 (6분 라이브 데모)
 
-**시나리오: "독서 모임 '책벌레들'의 1월 활동"**
+**시나리오: "신규 회원 이영희의 계모임 가입 여정"**
 
 ```
-[1분] 로그인 및 대시보드
-  - 테스트 계정 "CP_김철수"로 로그인 (👑 계주)
-  - 모임 "책벌레들" 대시보드 진입
-  - 현재 잔액: 50만원, 멤버 4명 확인
+[1분] 🌟 재정 프로필 설정 (핵심 미션)
+  - 신규 회원 "이영희" 로그인
+  - 온보딩 화면에서 재정 정보 입력
+    * 월 수입: 350만원
+    * 월 지출: 280만원
+    * 저축 가능액: 70만원
+    * 희망 납입금: 10만원
+  - Django 분석 결과 확인
+    * "적정 월 납입금: 10.5만원"
+    * "재정 건전성 점수: 80점 (보통)"
+    * "당신에게 맞는 계모임을 추천해드릴게요!"
+
+[1분] 🔍 재정 기반 계모임 추천
+  - "계모임 추천받기" 버튼 클릭
+  - 취향 태그 선택: #독서 #문화
+  - 추천 결과 표시
+    * "책벌레들 (92% 매칭) - 10만원/월, 재정 적합"
+    * "영화광들 (78% 매칭) - 8만원/월, 여유"
+  - 매칭 이유 표시
+    * "취향 일치율 85%"
+    * "적정 납입금 범위 내"
+
+[1분] 계모임 가입 및 대시보드
+  - "책벌레들" 계모임 가입
+  - 모임 대시보드 진입
+  - 현재 잔액: 50만원, 멤버 5명 확인
+  - 본인 신뢰점수: 80점 표시
 
 [1.5분] 투명 장부 확인
   - 장부 탭 클릭
@@ -435,26 +585,47 @@ public void castVote(Long expenseId, boolean approve) { ... }
     * "가장 많이 쓴 카테고리: 도서구입"
 
 [1분] 지출 요청 및 투표 승인
-  - CP가 지출 요청 등록
+  - CP_김철수 계정으로 전환 (👑 계주)
+  - 지출 요청 등록
     * 항목: "2월 독서 모임 장소 대관료"
     * 금액: 10만원
-  - 다른 계정 "멤버_이영희"로 로그인
+  - 이영희 계정으로 전환
   - 투표 화면에서 "찬성" 클릭
   - 과반수 달성 → 상태 "승인됨"으로 전환 확인
 
-[1분] SNS 소통
-  - 피드에 "이번 달 추천 도서: 채식주의자" 글 작성
-  - 다른 멤버가 댓글 작성: "읽어봤어요! 좋았어요"
-  - 공지사항 핀 고정 확인 (👑 CP만 가능)
-
-[0.5분] 🔍 취향 검색 시연 (Elasticsearch)
-  - 검색창에 "독서" 입력
-  - 태그 기반 검색 결과 표시
-  - 카테고리 필터 ("문화/예술") 적용
-  - "Rate보다 Taste" 철학 설명
+[0.5분] SNS 소통 & 마무리
+  - 피드에 "가입 인사" 글 작성
+  - 다른 멤버가 댓글: "환영합니다!"
+  - 마무리: "재정 분석 → 맞춤 추천 → 투명 운영" 플로우 강조
 ```
 
-### 필수 기능 5가지 (4대 코어 + 모임관리)
+**핵심 메시지:**
+> "WOORIDO는 당신의 재정 상황을 분석하여 가장 적합한 계모임을 찾아드립니다.
+> 고객 수입·지출 데이터 분석 기반, 이것이 우리의 핵심 미션입니다."
+
+### 필수 기능 6가지 (5대 코어 + 모임관리)
+
+#### 0. 💰 재정 프로필 분석 (핵심 미션) 🌟
+**구현 범위:**
+- 온보딩 재정 정보 입력 폼
+  * 월 수입, 월 지출, 저축 가능액
+  * 희망 월 납입금
+  * 지출 카테고리 비율 (선택)
+- **Django 분석 연동**
+  * API: POST /api/analyze/financial-profile
+  * pandas 계산:
+    - 적정 월 납입금 = 저축가능액 × 15%
+    - 재정 건전성 점수 = (저축률 / 25%) × 100
+    - 리스크 등급 분류
+  * 결과를 카드 형태로 표시
+- 신뢰 점수 대시보드
+  * 재정건전성(40%) + 완주율(30%) + 투표참여(20%) + 활동(10%)
+
+**시연에서 제외:**
+- ❌ MyData API 연동 (수동 입력만)
+- ❌ AI 기반 예측 (간단한 공식만)
+
+---
 
 #### 1. 모임 생성 및 관리 ✅
 **구현 범위:**

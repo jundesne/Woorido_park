@@ -5,36 +5,48 @@
 **대상**: Spring Boot 백엔드 개발자
 **목적**: 프론트엔드 Phase 3 & 5A에서 필요한 모든 API 구현
 **프론트엔드**: 타입, hooks, stores 모두 구현 완료
+**핵심 미션**: **고객 수입·지출 데이터 분석 기반** 지역 계모임 운영 솔루션
 
 ---
 
 ## 🎯 구현 필요 API 목록
 
+### 🌟 핵심 미션 API (고객 재정 분석)
+1. ❌ **재정 프로필 등록/수정** - TODO (핵심)
+2. ❌ **재정 프로필 조회** - TODO (핵심)
+3. ❌ **신뢰 점수 조회** - TODO (핵심)
+4. ❌ **계모임 추천** - TODO (핵심)
+
+### Django 분석 API (Stateless Brain)
+5. ❌ **재정 프로필 분석** - TODO (Django)
+6. ❌ **계모임 추천 분석** - TODO (Django)
+7. ❌ **월간 장부 통계** - TODO (Django)
+
 ### Phase 3 TODO (Gye 관리)
-1. ✅ **계 목록 조회** - 이미 구현 가정
-2. ✅ **계 상세 조회** - 이미 구현 가정
-3. ❌ **계 생성** - TODO
-4. ❌ **계 수정** - TODO
-5. ❌ **계 가입** - TODO
-6. ❌ **계 탈퇴** - TODO
-7. ❌ **계 멤버 목록** - TODO
+8. ✅ **계 목록 조회** - 이미 구현 가정
+9. ✅ **계 상세 조회** - 이미 구현 가정
+10. ❌ **계 생성** - TODO
+11. ❌ **계 수정** - TODO
+12. ❌ **계 가입** - TODO
+13. ❌ **계 탈퇴** - TODO
+14. ❌ **계 멤버 목록** - TODO
 
 ### Phase 3 TODO (Ledger 공개 장부)
-8. ❌ **공개 장부 타임라인** - TODO
-9. ❌ **공개 장부 요약** - TODO
+15. ❌ **공개 장부 타임라인** - TODO
+16. ❌ **공개 장부 요약** - TODO
 
 ### Phase 5A (SNS 기능)
-10. ❌ **계 피드 조회** (무한 스크롤)
-11. ❌ **포스트 생성/수정/삭제**
-12. ❌ **포스트 좋아요/취소**
-13. ❌ **댓글 조회/생성/수정/삭제**
-14. ❌ **댓글 좋아요/취소**
-15. ❌ **대댓글 조회**
-16. ❌ **미디어 업로드/삭제**
-17. ❌ **공지사항 CRUD** (계주만)
-18. ❌ **공지사항 읽음 처리**
+17. ❌ **계 피드 조회** (무한 스크롤)
+18. ❌ **포스트 생성/수정/삭제**
+19. ❌ **포스트 좋아요/취소**
+20. ❌ **댓글 조회/생성/수정/삭제**
+21. ❌ **댓글 좋아요/취소**
+22. ❌ **대댓글 조회**
+23. ❌ **미디어 업로드/삭제**
+24. ❌ **공지사항 CRUD** (계주만)
+25. ❌ **공지사항 읽음 처리**
 
-**총 18개 API 엔드포인트**
+**총 25개 API 엔드포인트** (기존 18개 + 핵심 미션 7개)
 
 ---
 
@@ -88,6 +100,463 @@ POST-003: 유효하지 않은 미디어
 
 COMMENT-001: 댓글을 찾을 수 없음
 COMMENT-002: 댓글 권한 없음
+```
+
+---
+
+# PART 0: 핵심 미션 API (고객 재정 분석) 🌟
+
+> **"고객 수입·지출 데이터 분석 기반 지역 계모임 운영 솔루션 구축"**
+> 이 섹션은 프로젝트 핵심 미션을 구현하는 API입니다.
+
+## 데이터 흐름
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                    고객 재정 분석 파이프라인                         │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                     │
+│  [1] 사용자 입력 (온보딩)                                           │
+│      Frontend → POST /api/users/{id}/financial-profile              │
+│                                                                     │
+│  [2] Spring Boot → Django 분석 요청                                 │
+│      POST http://django:8000/api/analyze/financial-profile          │
+│                                                                     │
+│  [3] Django pandas 분석 → 결과 반환                                 │
+│      { 적정납입금, 재정건전성점수, 리스크등급 }                       │
+│                                                                     │
+│  [4] Spring Boot → Oracle 저장                                      │
+│      user_financial_profiles, user_trust_scores 테이블              │
+│                                                                     │
+│  [5] 계모임 추천 요청 시                                            │
+│      GET /api/gyes/recommendations?userId={id}                      │
+│      → Django 분석 + Elasticsearch 검색 결합                        │
+│                                                                     │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 0-1. 재정 프로필 등록/수정
+
+### `POST /api/users/{userId}/financial-profile`
+
+**권한**: 본인만 (userId === JWT user)
+
+**Request Body**:
+```json
+{
+  "monthlyIncome": 3500000,
+  "monthlyExpense": 2800000,
+  "savingsCapacity": 700000,
+  "expenseCategories": {
+    "food": 30,
+    "transport": 15,
+    "culture": 10,
+    "housing": 25,
+    "etc": 20
+  },
+  "desiredContribution": 100000,
+  "riskTolerance": "medium"
+}
+```
+
+**Validation**:
+- `monthlyIncome`: 0 이상 (필수)
+- `monthlyExpense`: 0 이상 (필수)
+- `savingsCapacity`: 0 이상, monthlyIncome - monthlyExpense 이하 (필수)
+- `expenseCategories`: 합계 100% (선택)
+- `desiredContribution`: 0 이상 (선택)
+- `riskTolerance`: "low" | "medium" | "high" (선택, 기본 "medium")
+
+**비즈니스 로직**:
+1. Spring Boot → Django API 호출
+   ```
+   POST http://django:8000/api/analyze/financial-profile
+   Body: { income, expense, savingsCapacity, categories }
+   ```
+2. Django 분석 결과 수신
+3. user_financial_profiles 테이블 UPSERT
+4. user_trust_scores 테이블 재정건전성 점수 업데이트
+
+**Response 200**:
+```json
+{
+  "data": {
+    "profile": {
+      "id": "profile-uuid",
+      "userId": "user-uuid",
+      "monthlyIncome": 3500000,
+      "monthlyExpense": 2800000,
+      "savingsCapacity": 700000,
+      "expenseCategories": {
+        "food": 30,
+        "transport": 15,
+        "culture": 10,
+        "housing": 25,
+        "etc": 20
+      },
+      "desiredContribution": 100000,
+      "riskTolerance": "medium",
+      "createdAt": "2025-12-23T10:00:00Z",
+      "updatedAt": "2025-12-23T10:00:00Z"
+    },
+    "analysis": {
+      "appropriateContribution": 105000,
+      "financialHealthScore": 80.0,
+      "riskLevel": "medium",
+      "savingsRate": 20.0,
+      "analysisComment": "재정 건전성이 보통입니다 (80점). 적정 납입금 범위 내에서 참여를 권장합니다."
+    }
+  }
+}
+```
+
+---
+
+## 0-2. 재정 프로필 조회
+
+### `GET /api/users/{userId}/financial-profile`
+
+**권한**: 본인만
+
+**Response 200**: 0-1과 동일
+
+**Response 404**: 프로필 미등록
+```json
+{
+  "code": "PROFILE-001",
+  "message": "재정 프로필이 등록되지 않았습니다."
+}
+```
+
+---
+
+## 0-3. 신뢰 점수 조회
+
+### `GET /api/users/{userId}/trust-score`
+
+**권한**: 본인만
+
+**Response 200**:
+```json
+{
+  "data": {
+    "trustScore": {
+      "userId": "user-uuid",
+      "financialHealthScore": 80.0,
+      "completionRate": 100.0,
+      "voteParticipation": 85.0,
+      "communityActivity": 70.0,
+      "totalTrustScore": 82.5,
+      "rank": "상위 25%",
+      "calculatedAt": "2025-12-23T10:00:00Z"
+    },
+    "breakdown": {
+      "financialHealth": {
+        "score": 80.0,
+        "weight": 0.4,
+        "contribution": 32.0
+      },
+      "completion": {
+        "score": 100.0,
+        "weight": 0.3,
+        "contribution": 30.0
+      },
+      "voteParticipation": {
+        "score": 85.0,
+        "weight": 0.2,
+        "contribution": 17.0
+      },
+      "communityActivity": {
+        "score": 70.0,
+        "weight": 0.1,
+        "contribution": 7.0
+      }
+    }
+  }
+}
+```
+
+**신뢰 점수 계산 공식**:
+```
+totalTrustScore = (financialHealthScore × 0.4)
+                + (completionRate × 0.3)
+                + (voteParticipation × 0.2)
+                + (communityActivity × 0.1)
+```
+
+---
+
+## 0-4. 계모임 추천
+
+### `GET /api/gyes/recommendations`
+
+**권한**: 인증된 사용자
+
+**Query Parameters**:
+```typescript
+userId: string           // 필수
+limit?: number           // 기본 10
+tags?: string[]          // 취향 태그 필터 (선택)
+category?: string        // 카테고리 필터 (선택)
+minContribution?: number // 최소 월 납입금 (선택)
+maxContribution?: number // 최대 월 납입금 (선택)
+```
+
+**비즈니스 로직**:
+1. 사용자 재정 프로필 조회
+2. Spring Boot → Django API 호출
+   ```
+   POST http://django:8000/api/analyze/gye-recommendation
+   Body: { userProfile, preferences, availableGyes }
+   ```
+3. Elasticsearch 검색 (취향 태그, 카테고리)
+4. Django 매칭 점수 + Elasticsearch 결과 결합
+5. 정렬 및 반환
+
+**Response 200**:
+```json
+{
+  "data": {
+    "recommendations": [
+      {
+        "gye": {
+          "id": "gye-uuid-1",
+          "name": "책벌레들",
+          "description": "독서를 사랑하는 사람들의 모임",
+          "type": "savings",
+          "monthlyAmount": 100000,
+          "currentMembers": 6,
+          "maxMembers": 10,
+          "tags": ["독서", "문학", "자기계발"],
+          "category": "문화/예술"
+        },
+        "matchScore": 92,
+        "reasons": [
+          "취향 일치율 85%",
+          "적정 납입금 범위 내",
+          "멤버 평균 신뢰점수와 유사"
+        ],
+        "financialFit": {
+          "yourContribution": 100000,
+          "appropriateRange": "80,000원 ~ 120,000원",
+          "status": "적합"
+        }
+      },
+      {
+        "gye": {
+          "id": "gye-uuid-2",
+          "name": "영화광들",
+          "description": "매주 영화 감상하는 모임",
+          "type": "savings",
+          "monthlyAmount": 80000,
+          "currentMembers": 4,
+          "maxMembers": 8,
+          "tags": ["영화", "문화", "주말모임"],
+          "category": "문화/예술"
+        },
+        "matchScore": 78,
+        "reasons": [
+          "취향 일치율 65%",
+          "적정 납입금보다 낮음 (여유 있음)",
+          "소규모 모임 선호 매칭"
+        ],
+        "financialFit": {
+          "yourContribution": 80000,
+          "appropriateRange": "80,000원 ~ 120,000원",
+          "status": "여유"
+        }
+      }
+    ],
+    "total": 2,
+    "userProfile": {
+      "appropriateContribution": 105000,
+      "trustScore": 82.5,
+      "preferences": ["독서", "영화", "문화"]
+    }
+  }
+}
+```
+
+---
+
+# Django 분석 API (Stateless Brain)
+
+> Django는 DB에 직접 연결하지 않고, Spring Boot로부터 받은 JSON을 pandas로 분석하여 결과만 반환합니다.
+
+## D-1. 재정 프로필 분석
+
+### `POST /api/analyze/financial-profile` (Django)
+
+**호출자**: Spring Boot만
+
+**Request Body**:
+```json
+{
+  "income": 3500000,
+  "expense": 2800000,
+  "savingsCapacity": 700000,
+  "categories": {
+    "food": 30,
+    "transport": 15,
+    "culture": 10,
+    "housing": 25,
+    "etc": 20
+  }
+}
+```
+
+**Response 200**:
+```json
+{
+  "appropriateContribution": 105000,
+  "financialHealthScore": 80.0,
+  "riskLevel": "medium",
+  "savingsRate": 20.0,
+  "analysis": "재정 건전성이 보통입니다 (80점). 적정 납입금 범위 내에서 참여를 권장합니다."
+}
+```
+
+**Django 분석 로직**:
+```python
+# 적정 월 납입금 = 저축가능액 × 15%
+appropriate = savings_capacity * 0.15
+
+# 저축률 = 저축가능액 / 수입
+savings_rate = savings_capacity / income
+
+# 재정건전성 점수 = (저축률 / 목표저축률 25%) × 100, 최대 100점
+health_score = min(100, (savings_rate / 0.25) * 100)
+
+# 리스크 등급
+if health_score >= 90: risk = 'low'
+elif health_score >= 70: risk = 'medium'
+else: risk = 'high'
+```
+
+---
+
+## D-2. 계모임 추천 분석
+
+### `POST /api/analyze/gye-recommendation` (Django)
+
+**호출자**: Spring Boot만
+
+**Request Body**:
+```json
+{
+  "userProfile": {
+    "appropriateContribution": 105000,
+    "trustScore": 82.5,
+    "riskLevel": "medium",
+    "preferences": ["독서", "영화"]
+  },
+  "availableGyes": [
+    {
+      "id": "gye-1",
+      "monthlyAmount": 100000,
+      "avgTrustScore": 78,
+      "tags": ["독서", "문학"],
+      "currentMembers": 6,
+      "maxMembers": 10
+    },
+    {
+      "id": "gye-2",
+      "monthlyAmount": 150000,
+      "avgTrustScore": 85,
+      "tags": ["영화", "문화"],
+      "currentMembers": 4,
+      "maxMembers": 8
+    }
+  ]
+}
+```
+
+**Response 200**:
+```json
+{
+  "recommendations": [
+    {
+      "gyeId": "gye-1",
+      "matchScore": 92,
+      "reasons": [
+        "취향 일치율 85%",
+        "적정 납입금 범위 내",
+        "멤버 평균 신뢰점수와 유사"
+      ],
+      "financialFit": "적합"
+    },
+    {
+      "gyeId": "gye-2",
+      "matchScore": 65,
+      "reasons": [
+        "취향 일치율 50%",
+        "적정 납입금 초과 (위험)",
+        "신뢰 점수 차이 있음"
+      ],
+      "financialFit": "초과"
+    }
+  ]
+}
+```
+
+**Django 매칭 로직**:
+```python
+def calculate_match_score(user, gye):
+    # 1. 재정 적합성 (40%)
+    contribution_diff = abs(user.appropriate - gye.monthly_amount)
+    financial_score = max(0, 100 - (contribution_diff / user.appropriate * 100))
+
+    # 2. 취향 일치율 (35%)
+    common_tags = set(user.preferences) & set(gye.tags)
+    taste_score = len(common_tags) / len(user.preferences) * 100
+
+    # 3. 신뢰 점수 유사도 (25%)
+    trust_diff = abs(user.trust_score - gye.avg_trust_score)
+    trust_score = max(0, 100 - trust_diff)
+
+    return financial_score * 0.4 + taste_score * 0.35 + trust_score * 0.25
+```
+
+---
+
+## D-3. 월간 장부 통계 분석
+
+### `POST /api/analyze/monthly-stats` (Django)
+
+**호출자**: Spring Boot만
+
+**Request Body**:
+```json
+{
+  "transactions": [
+    {"date": "2026-01-05", "amount": 50000, "category": "식비", "type": "expense"},
+    {"date": "2026-01-10", "amount": 120000, "category": "회식", "type": "expense"},
+    {"date": "2026-01-15", "amount": 100000, "category": "납입", "type": "income"}
+  ]
+}
+```
+
+**Response 200**:
+```json
+{
+  "summary": {
+    "totalIncome": 100000,
+    "totalExpense": 170000,
+    "balance": -70000,
+    "avgDailyExpense": 5666
+  },
+  "categoryBreakdown": {
+    "식비": {"amount": 50000, "ratio": 29.4},
+    "회식": {"amount": 120000, "ratio": 70.6}
+  },
+  "trend": {
+    "direction": "increasing",
+    "changeRate": 15.2,
+    "message": "지출이 전월 대비 15.2% 증가했습니다."
+  }
+}
 ```
 
 ---
@@ -916,6 +1385,56 @@ limit?: number  // 기본 10
 
 # 📊 DB 스키마 전체
 
+## 핵심 미션: 재정 프로필 관련 🌟
+
+### user_financial_profiles
+```sql
+CREATE TABLE user_financial_profiles (
+  id UUID PRIMARY KEY,
+  user_id UUID NOT NULL REFERENCES users(id) UNIQUE,
+  monthly_income BIGINT NOT NULL,           -- 월 수입
+  monthly_expense BIGINT NOT NULL,          -- 월 지출
+  savings_capacity BIGINT NOT NULL,         -- 월 저축 가능액
+  expense_categories JSONB,                 -- {"food": 30, "transport": 15, ...}
+  desired_contribution BIGINT,              -- 희망 월 납입금
+  risk_tolerance VARCHAR(10) DEFAULT 'medium', -- 'low', 'medium', 'high'
+  created_at TIMESTAMP NOT NULL,
+  updated_at TIMESTAMP NOT NULL,
+  INDEX idx_user (user_id)
+);
+```
+
+### user_trust_scores
+```sql
+CREATE TABLE user_trust_scores (
+  id UUID PRIMARY KEY,
+  user_id UUID NOT NULL REFERENCES users(id) UNIQUE,
+  financial_health_score DECIMAL(5,2) DEFAULT 0,  -- 재정 건전성 (0-100)
+  completion_rate DECIMAL(5,2) DEFAULT 0,         -- 계모임 완주율 (0-100)
+  vote_participation DECIMAL(5,2) DEFAULT 0,      -- 투표 참여율 (0-100)
+  community_activity DECIMAL(5,2) DEFAULT 0,      -- 커뮤니티 활동 (0-100)
+  total_trust_score DECIMAL(5,2) DEFAULT 0,       -- 종합 신뢰 점수 (0-100)
+  calculated_at TIMESTAMP NOT NULL,
+  INDEX idx_user (user_id),
+  INDEX idx_total_score (total_trust_score DESC)
+);
+```
+
+### financial_analysis_logs (선택사항 - 디버깅용)
+```sql
+CREATE TABLE financial_analysis_logs (
+  id UUID PRIMARY KEY,
+  user_id UUID NOT NULL REFERENCES users(id),
+  request_payload JSONB NOT NULL,           -- Django로 보낸 요청
+  response_payload JSONB NOT NULL,          -- Django에서 받은 응답
+  analysis_type VARCHAR(30) NOT NULL,       -- 'financial_profile', 'gye_recommendation', 'monthly_stats'
+  created_at TIMESTAMP NOT NULL,
+  INDEX idx_user_created (user_id, created_at DESC)
+);
+```
+
+---
+
 ## Gye 관련
 
 ### gyes (기존 테이블 가정)
@@ -1118,22 +1637,30 @@ CREATE TABLE announcement_reads (
 
 # 🚀 구현 우선순위
 
+## Phase 0 (핵심 미션 - 최우선) 🌟
+> **"고객 수입·지출 데이터 분석 기반"** - 이것이 프로젝트의 핵심 미션입니다.
+
+1. **재정 프로필 등록/조회 API** (Spring Boot)
+2. **Django 재정 분석 엔드포인트** (필수)
+3. **신뢰 점수 계산 로직**
+4. **계모임 추천 API** (Elasticsearch 연동)
+
 ## Phase 1 (MVP - 1주)
-1. 계 생성/가입/멤버 조회 (필수)
-2. 포스트 생성/조회 (SNS 기본)
-3. 댓글 생성/조회
-4. 미디어 업로드
+5. 계 생성/가입/멤버 조회 (필수)
+6. 포스트 생성/조회 (SNS 기본)
+7. 댓글 생성/조회
+8. 미디어 업로드
 
 ## Phase 2 (Core - 1주)
-5. 계 수정/탈퇴
-6. 공개 장부 타임라인/요약
-7. 포스트 좋아요/댓글 좋아요
-8. 공지사항 CRUD
+9. 계 수정/탈퇴
+10. 공개 장부 타임라인/요약
+11. 포스트 좋아요/댓글 좋아요
+12. 공지사항 CRUD
 
 ## Phase 3 (Advanced - 선택)
-9. 대댓글 기능
-10. 인용 포스트
-11. 공지사항 읽음 추적
+13. 대댓글 기능
+14. 인용 포스트
+15. 공지사항 읽음 추적
 
 ---
 
