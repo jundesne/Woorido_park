@@ -1,8 +1,10 @@
 # 🛠️ WOORIDO 개발 환경 및 의존성 명세서
 
-> **Project:** WOORIDO (Frontend + Backend)
-> **Last Updated:** 2025-12-26
-> **Status:** Production Ready
+> **Project:** WOORIDO (Frontend + Backend + Analytics)
+> **Version:** v2.0 - Final Specification Aligned
+> **Last Updated:** 2025-12-30
+> **Status:** Development Ready
+> **Based On:** PRODUCT_AGENDA v3.0 Final, IA_SPECIFICATION v2.1
 
 ---
 
@@ -42,34 +44,46 @@ WOORIDO 프로젝트는 다음 원칙에 따라 개발 환경을 구성합니다
 ```
 ┌─────────────────────────────────────────────────────────┐
 │  Frontend (React 18 + Vite + TypeScript)                │
-│  - Mobile-First Responsive Design                       │
+│  - SNS-First Design (피드 우선)                          │
+│  - Mobile-First Responsive                              │
 │  - MSW (Mock Service Worker) for Frontend-First Dev    │
+│  - 2026 UI/UX Trends (Skeleton, Glassmorphism)         │
 └─────────────────┬───────────────────────────────────────┘
                   │ REST API (JSON)
 ┌─────────────────┴───────────────────────────────────────┐
 │  Backend: Spring Boot (Java 17) + MyBatis              │
-│  - Main Business Logic                                  │
+│  - Main Business Logic (모임/투표/장부/유저 CRUD)        │
 │  - Transaction Management                               │
+│  - JWT 인증 및 권한 관리                                 │
+│  - 토스페이 결제 연동 (MVP)                              │
+│  - Django 분석 요청 라우팅                               │
 └─────┬───────────────────┬───────────────────────────────┘
       │                   │
       │ HTTP API          │ JDBC
       ▼                   ▼
 ┌──────────────┐    ┌──────────────┐
-│ Django       │    │ Oracle DB    │
+│ Django 5.1   │    │ Oracle 21c   │
 │ (Analytics)  │    │ (Main Store) │
+│              │    │              │
+│ ❌ DB 직접   │    │ ✅ Spring만  │
+│   연결 금지  │    │   연결       │
 └──────────────┘    └──────────────┘
       │
-      │ pandas/numpy
+      │ pandas/numpy 분석
       ▼
-┌──────────────┐
-│ Financial    │
-│ Analysis     │
-└──────────────┘
+┌──────────────────────────────────────┐
+│ Financial Analysis (Demo Day 핵심)   │
+│ - 월별 지출 통계                      │
+│ - 카테고리별 비율                     │
+│ - 지출 트렌드                        │
+│ - 재정 건전성 분석                    │
+└──────────────────────────────────────┘
 
 ┌──────────────────────────────────────┐
-│ Elasticsearch                        │
+│ 🔴 Elasticsearch (Post-Demo)         │
 │ - Group Search (태그, 카테고리, 키워드) │
 │ - Real-time Autocomplete             │
+│ - **Demo Day 제외** (2순위 기능)      │
 └──────────────────────────────────────┘
 ```
 
@@ -150,9 +164,28 @@ WOORIDO 프로젝트는 다음 원칙에 따라 개발 환경을 구성합니다
 
 ---
 
-### 2.3 UI 라이브러리
+### 2.3 2026 UI/UX 트렌드 적용
 
-#### 2.3.1 컴포넌트 라이브러리
+**IA_SPECIFICATION v2.0 기반 트렌드:**
+
+| 트렌드 | 적용 영역 | 구현 라이브러리 |
+|--------|----------|---------------|
+| **Skeleton UI** | 모든 로딩 상태 | custom CSS + Framer Motion |
+| **Glassmorphism** | Modal, Card | backdrop-filter CSS |
+| **Micro-interactions** | 투표, 좋아요, 충전 | Framer Motion |
+| **Progressive Disclosure** | 가입 플로우, 장부 상세 | React State Management |
+| **Minimalist Design** | 전체 UI | Tailwind CSS |
+| **Dark Mode** | 전체 (Post-Demo) | Tailwind dark: variants |
+
+**Sources:**
+- [Mobile App UI/UX Design Trends 2026](https://www.letsgroto.com/blog/mobile-app-ui-ux-design-trends-2026-the-only-guide-you-ll-need)
+- [Top 10 Fintech UX Design Practices 2026](https://www.onething.design/post/top-10-fintech-ux-design-practices-2026)
+
+---
+
+### 2.4 UI 라이브러리
+
+#### 2.4.1 컴포넌트 라이브러리
 
 | 패키지 | 현재 버전 | 용도 | 우선순위 |
 |--------|----------|------|---------|
@@ -163,18 +196,22 @@ WOORIDO 프로젝트는 다음 원칙에 따라 개발 환경을 구성합니다
 | **framer-motion** | 11.15.0 → 12.23.26 | 애니메이션 | P1 |
 | **lucide-react** | 0.468.0 → 0.562.0 | 아이콘 | P1 |
 
-**Radix UI 컴포넌트 목록 (IA 매핑):**
+**Radix UI 컴포넌트 목록 (IA v2.1 매핑):**
 
 ```typescript
 // IA Type → Radix UI 매핑
-Modal      → @radix-ui/react-dialog        // 출금 신청, 가입 신청
-Drawer     → Custom Implementation         // 필터, 알림 목록
-Tab        → @radix-ui/react-tabs          // 소식/일정/멤버/회비
-Toast      → sonner (Radix-based)          // 알림 메시지
+Modal      → @radix-ui/react-dialog        // 가입 신청, 충전, 보증금 해제 확인
+BottomSheet→ @radix-ui/react-sheet         // 락 상세, 필터
+Tab        → @radix-ui/react-tabs          // 피드/장부/투표/멤버
+Toast      → sonner (Radix-based)          // 성공/에러 메시지
 Dropdown   → @radix-ui/react-dropdown-menu // 사용자 메뉴
 Select     → @radix-ui/react-select        // 카테고리 선택
 Avatar     → @radix-ui/react-avatar        // 프로필 이미지
-Progress   → @radix-ui/react-progress      // 진행률 표시
+Progress   → @radix-ui/react-progress      // 투표 진행률, 충전 Progress Bar
+
+// IA v2.1 신규 컴포넌트
+Skeleton   → Custom (Tailwind + Framer)   // 로딩 UX
+EmptyState → Custom Component             // 빈 상태 CTA
 ```
 
 #### 2.3.2 차트 라이브러리
@@ -184,14 +221,25 @@ Progress   → @radix-ui/react-progress      // 진행률 표시
 | **recharts** | 2.15.0 | 장부 통계 시각화 | ✅ P0 |
 | react-circular-progressbar | 2.2.0 | 참여율 표시 | ✅ P1 |
 
-**Recharts 구현 예정 차트:**
-- Line Chart: 일별 지출 추이
-- Pie Chart: 카테고리별 지출 비율
-- Bar Chart: 월별 납입률 비교
+**Recharts 구현 예정 차트 (Django 분석 연동):**
+- Line Chart: 월별 지출 추이 (Django `/api/analyze/trend`)
+- Pie Chart: 카테고리별 지출 비율 (Django `/api/analyze/category-ratio`)
+- Bar Chart: 월별 납입률 비교 (Post-Demo)
+
+**Django 분석 Fallback 전략:**
+```typescript
+// Django 분석 실패 시 기본 통계만 표시
+try {
+  const analysis = await fetchDjangoAnalysis(groupId);
+  return <RechartsLineChart data={analysis.trend} />;
+} catch (error) {
+  return <SimpleStats total={basicStats.total} avg={basicStats.avg} />;
+}
+```
 
 ---
 
-### 2.4 상태 관리 및 데이터 페칭
+### 2.5 상태 관리 및 데이터 페칭
 
 | 패키지 | 버전 | 용도 | 비고 |
 |--------|------|------|------|
@@ -220,9 +268,9 @@ const useUIStore = create((set) => ({
 
 ---
 
-### 2.5 개발 도구
+### 2.6 개발 도구
 
-#### 2.5.1 코드 품질
+#### 2.6.1 코드 품질
 
 | 패키지 | 버전 | 용도 |
 |--------|------|------|
@@ -232,7 +280,7 @@ const useUIStore = create((set) => ({
 | **lint-staged** | 16.2.7 | Git Hook 린팅 |
 | **husky** | 9.1.7 | Git Hook 관리 |
 
-#### 2.5.2 테스트 및 모킹
+#### 2.6.2 테스트 및 모킹
 
 | 패키지 | 버전 | 용도 |
 |--------|------|------|
@@ -256,7 +304,7 @@ export const groupHandlers = [
 ];
 ```
 
-#### 2.5.3 스토리북
+#### 2.6.3 스토리북
 
 | 패키지 | 버전 | 용도 |
 |--------|------|------|
@@ -279,9 +327,15 @@ export const groupHandlers = [
 | 항목 | 권장 버전 | 비고 |
 |------|----------|------|
 | **Java** | **17.0.16 LTS** | 사용자 지정 버전 (보안 패치 포함) |
-| **Spring Boot** | **3.1.x** | Java 17 LTS 지원, 안정성 중심 |
+| **Spring Boot** | **3.1.18** | Java 17 LTS 지원, 안정성 중심, MyBatis 호환 |
 | **MyBatis** | **3.5.16** | Spring Boot 3.x 호환 |
 | **MyBatis-Spring-Boot-Starter** | **3.0.3** | Spring Boot 3.1.x 호환 |
+
+**⚠️ MyBatis vs JPA 선택:**
+- **우리두 선택: MyBatis** (복잡한 SQL 쿼리 직접 제어 필요)
+- 장부, 회비 계산 등 복잡한 집계 쿼리에 유리
+- XML 매퍼로 SQL과 코드 분리
+- 안정성 검증 완료
 
 **Java 17.0.16 선정 이유:**
 - ✅ LTS 버전 (2029년까지 지원)
@@ -424,20 +478,34 @@ def analyze_finance(request):
 - 트랜잭션 안정성 (회비 입출금)
 - ACID 보장 (장부 데이터 무결성)
 
-#### 3.3.2 Elasticsearch
+#### 3.3.2 Elasticsearch (Post-Demo)
+
+**⚠️ Demo Day 제외 - 2순위 기능**
 
 | 항목 | 권장 버전 | 비고 |
 |------|----------|------|
 | **Elasticsearch** | **8.16.x** | 최신 안정 버전 |
 | **Elasticsearch Java Client** | **8.16.2** | Spring Boot 연동 |
 
-**사용 목적:**
+**사용 목적 (Post-Demo):**
 - 모임 검색 (키워드, 태그, 카테고리)
 - 실시간 자동완성
 - 전문 검색 (Full-text Search)
 
+**Demo Day 대체 방안:**
+- Oracle `LIKE` 검색으로 기본 구현
+- 카테고리 필터 (Dropdown)
+- Post-Demo에 Elasticsearch 마이그레이션
+
 ```java
-// Spring Boot + Elasticsearch 연동
+// Demo Day: Oracle LIKE 검색
+@Repository
+public interface GroupRepository {
+    @Select("SELECT * FROM groups WHERE name LIKE #{keyword} OR description LIKE #{keyword}")
+    List<Group> searchByKeyword(@Param("keyword") String keyword);
+}
+
+// Post-Demo: Elasticsearch 연동
 @Service
 public class GroupSearchService {
     @Autowired
@@ -474,9 +542,96 @@ public class GroupSearchService {
 
 ---
 
-## 5. 의존성 업데이트 권장사항
+## 5. 개발 일정 및 우선순위 (Demo Day 역산)
 
-### 5.1 즉시 업데이트 권장 (보안/안정성)
+### 5.1 Phase 1-7 타임라인 (PRODUCT_AGENDA v3.0)
+
+**전체 기간: 2025-12-30 ~ 2026-02-25 (57일, 8주)**
+
+| Phase | 기간 | 주요 기능 | API 수 | Checkpoint |
+|-------|------|----------|--------|-----------|
+| **Phase 1** | Week 1 (12/30-1/5) | 환경 세팅 + 로그인 + Seed 데이터 | 2개 | 개발환경 100% 작동, Spring↔Django 통신 성공 |
+| **Phase 2** | Week 2-3 (1/6-1/19) | **SNS 완성** (피드/댓글/좋아요/이미지) | 18개 | 피드 Full Flow 작동, 이미지 업로드 성공 |
+| **Phase 3** | Week 4 (1/20-1/26) | 가입 플로우 + 가상머니 + 모임 생성 | 14개 | 충전→가입→보증금락 Full Flow |
+| **Phase 4** | Week 5 (1/27-2/5) | **장부 + Django 분석** + 투표 API (Backend) | 8개 | 차트 렌더링, Django 분석 3초 이내 |
+| **Phase 5** | Week 6-7 (2/6-2/14) | **투표 시스템** (UI + Full Flow) | 5개 | 지출요청→투표→승인→장부 Full Flow |
+| **Phase 6** | Week 8 (2/15-2/20) | 통합 테스트 + 버그 수정 | 0개 | 시연 성공률 100%, Spring↔Django 안정성 |
+| **Phase 7** | Week 9 (2/21-2/25) | 시연 리허설 | 0개 | Demo Day 준비 완료 |
+
+**총 API: Spring Boot 44개 + Django 4개 = 48개**
+
+### 5.2 SNS-First 개발 우선순위
+
+**1순위 (P0): Demo Day 필수**
+```
+Week 2-3: SNS (피드/댓글/좋아요/이미지) - 18 API
+  └─ 가장 먼저 완성 (사용자 이탈 방지)
+  └─ Seed 데이터 필요 (테스트 모임 2개 + 멤버 5명)
+  └─ 피드 작성 → 댓글 → 좋아요 Full Flow
+  └─ 이미지 업로드 (S3)
+  └─ 페이지네이션 (20개씩)
+  └─ 공지사항 핀 고정
+```
+
+**2순위 (P0): 신뢰 구축**
+```
+Week 4: 가입 플로우 + 가상머니
+  └─ 충전 (토스페이 Mock)
+  └─ 가입 시 보증금 락 (2개월치)
+  └─ 어카운트 잔액 표시 (가용/락 분리)
+```
+
+**3순위 (P0): 투명성**
+```
+Week 5: 장부 + Django 분석
+  └─ Django 분석 API 4개 (월별/카테고리/트렌드/재정건전성)
+  └─ Recharts Line Chart (월별 추이)
+  └─ Recharts Pie Chart (카테고리별 비율)
+  └─ Fallback UI (Django 실패 시 기본 통계)
+
+Week 6-7: 투표 시스템
+  └─ 지출 요청 → 투표 → 승인 → 장부 자동 기록
+  └─ 과반수 판정 로직
+```
+
+**4순위 (P1): 있으면 좋음**
+- 반응형 (Mobile + Desktop) - 동시 진행
+- 재정 프로필 입력 - 선택 기능
+
+**5순위 (P2): Post-Demo**
+- Elasticsearch 검색
+- 실시간 알림 (WebSocket)
+- 무한 스크롤
+- Dark Mode
+
+### 5.3 IA v2.1 신규 기능 반영
+
+**온보딩 플로우 (신규 유저 이탈 방지):**
+- 웰컴 카드 (첫 방문 유저)
+- 첫 충전 유도 CTA (잔액 0원 시)
+- 인기 모임 추천 (가입 모임 없을 때)
+
+**보증금 해제 플로우:**
+- `/groups/:id/complete` - 완주 축하 (보증금 → 가용 잔액)
+- `/groups/:id/leave` - 정상 탈퇴 확인
+- 강제 퇴출 Toast (보증금 몰수 알림)
+
+**Empty State CTA (모든 빈 상태):**
+- 빈 피드 → "첫 글 작성 유도"
+- 빈 투표 → "CP만 생성 가능 안내"
+- 빈 장부 → "첫 지출 요청 안내"
+- 빈 모임 → "모임 찾기 CTA"
+
+**로딩 UX:**
+- Skeleton UI (Card/List/Page 3종)
+- Progress Bar (이미지 업로드, 충전)
+- Optimistic UI (좋아요, 댓글)
+
+---
+
+## 6. 의존성 업데이트 권장사항
+
+### 6.1 즉시 업데이트 권장 (보안/안정성)
 
 ```bash
 # 마이너/패치 버전 업데이트
@@ -487,26 +642,29 @@ npm update eslint                    # 9.39.1 → 9.39.2
 npm update typescript-eslint         # 8.49.0 → 8.50.1
 ```
 
-### 5.2 Phase별 업데이트 계획
+### 6.2 Phase별 업데이트 계획
 
-**Phase 0 (Week 0-1): 환경세팅**
+**Phase 1 (Week 1): 환경세팅**
 - ✅ Storybook 최신화 (10.1.10)
 - ✅ Vite 최신화 (6.4.1)
 - ✅ ESLint/Prettier 설정
+- ✅ Django 프로젝트 초기화 + pandas/numpy
+- ✅ Spring↔Django HTTP 통신 테스트
 
-**Phase 1-2 (Week 2-5): 기능 개발**
+**Phase 2-3 (Week 2-4): 기능 개발**
 - ⏸️ 메이저 업데이트 금지 (안정성 우선)
 - ✅ 보안 패치만 적용
 
-**Phase 3 (Week 6-7): Django 연동**
+**Phase 4 (Week 5): Django 연동**
 - ⚠️ 기존 의존성 유지
+- ✅ Django 분석 API 4개 구현
 
 **Demo Day 이후:**
 - React 19.x 마이그레이션 검토
 - zustand 5.x 업그레이드
 - recharts 3.x 검토 (Breaking Changes 확인 필요)
 
-### 5.3 업데이트 금지 목록 (Demo Day 전)
+### 6.3 업데이트 금지 목록 (Demo Day 전)
 
 | 패키지 | 현재 버전 | Latest | 사유 |
 |--------|----------|--------|------|
@@ -518,9 +676,9 @@ npm update typescript-eslint         # 8.49.0 → 8.50.1
 
 ---
 
-## 6. 보안 체크리스트
+## 7. 보안 체크리스트
 
-### 6.1 프론트엔드 보안
+### 7.1 프론트엔드 보안
 
 - [ ] **XSS 방지**: React의 자동 이스케이핑 활용
 - [ ] **CSRF 방지**: Spring Security CSRF 토큰 검증
@@ -539,7 +697,7 @@ axios.interceptors.request.use((config) => {
 });
 ```
 
-### 6.2 백엔드 보안
+### 7.2 백엔드 보안
 
 - [ ] **SQL Injection 방지**: MyBatis PreparedStatement 사용
 - [ ] **인증/인가**: Spring Security + JWT
@@ -561,7 +719,7 @@ public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Excepti
 }
 ```
 
-### 6.3 의존성 보안 점검
+### 7.3 의존성 보안 점검
 
 ```bash
 # 프론트엔드
@@ -577,9 +735,9 @@ pip-audit
 
 ---
 
-## 7. 환경 변수 설정
+## 8. 환경 변수 설정
 
-### 7.1 프론트엔드 (.env)
+### 8.1 프론트엔드 (.env)
 
 ```bash
 # API Endpoint
@@ -595,7 +753,7 @@ VITE_GOOGLE_CLIENT_ID=your_google_client_id
 VITE_KAKAO_CLIENT_ID=your_kakao_client_id
 ```
 
-### 7.2 백엔드 (Spring Boot - application.yml)
+### 8.2 백엔드 (Spring Boot - application.yml)
 
 ```yaml
 spring:
@@ -619,7 +777,7 @@ jwt:
   expiration: 86400000  # 24시간
 ```
 
-### 7.3 백엔드 (Django - settings.py)
+### 8.3 백엔드 (Django - settings.py)
 
 ```python
 # settings.py
@@ -647,12 +805,16 @@ DATABASES = {
 | 날짜 | 버전 | 변경 내용 | 작성자 |
 |------|------|----------|--------|
 | 2025-12-26 | v1.0 | 초안 작성 (React2Shell 보안 분석 포함) | Development Team |
+| 2025-12-30 | v2.0 | **Final Specification 정렬**: Phase 1-7 일정 추가, SNS-First 우선순위 명시, Django 분석 역할 강화, Elasticsearch Post-Demo 이동, IA v2.1 신규 기능 반영 (보증금 해제, 온보딩, Empty State CTA), 2026 UI/UX 트렌드 추가, MyBatis vs JPA 명확화, API 수 명시 (Spring 44 + Django 4) | Development Team |
 
 ---
 
 **이 문서는 살아있는 문서(Living Document)입니다. 의존성 업데이트 시 지속적으로 업데이트됩니다.**
 
 **관련 문서:**
-- [IA_SPECIFICATION.md](./IA_SPECIFICATION.md) - IA 명세서
-- [PRODUCT_AGENDA.md](./PRODUCT_AGENDA.md) - 프로젝트 아젠다
-- [API_SPEC_COMPLETE.md](./API_SPEC_COMPLETE.md) - API 명세서
+- [PRODUCT_AGENDA.md](./Final/PRODUCT_AGENDA.md) - 프로젝트 아젠다 v3.0
+- [IA_SPECIFICATION.md](./Final/IA_SPECIFICATION.md) - IA 명세서 v2.1
+- [WOORIDO_FINAL_SPECIFICATION.md](./Final/WOORIDO_FINAL_SPECIFICATION.md) - 최종 설계 명세서 v1.0
+- [IA_Comprehensive_v2.csv](./Final/IA_Comprehensive_v2.csv) - 종합 IA
+- [IA_Event_Mapping_v2.csv](./Final/IA_Event_Mapping_v2.csv) - 이벤트 매핑
+- [IA_Development_Phase_v2.csv](./Final/IA_Development_Phase_v2.csv) - 개발 페이즈
