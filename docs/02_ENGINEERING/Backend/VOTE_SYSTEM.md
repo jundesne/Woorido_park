@@ -67,10 +67,11 @@ com.woorido
 │       ├── VoteService.java             // 메인 서비스
 │       ├── VoteApprovalService.java     // 승인 처리 서비스
 │       └── strategy
-│           ├── VoteApprovalStrategy.java       // 전략 인터페이스
-│           ├── ExpenseVoteStrategy.java        // 지출 투표 전략
-│           ├── KickVoteStrategy.java           // 강퇴 투표 전략
-│           └── RuleChangeVoteStrategy.java     // 규칙 변경 전략
+│           ├── VoteApprovalStrategy.java          // 전략 인터페이스
+│           ├── ExpenseVoteStrategy.java           // 오픈 사용 투표 전략
+│           ├── MeetingAttendanceVoteStrategy.java // ⭐ 정기 모임 참석 투표 전략
+│           ├── KickVoteStrategy.java              // 강퇴 투표 전략
+│           └── RuleChangeVoteStrategy.java        // 규칙 변경 전략
 │
 ├── controller
 │   └── VoteController.java
@@ -614,7 +615,78 @@ public class KickVoteStrategy implements VoteApprovalStrategy {
 }
 ```
 
-### 5.4 RuleChangeVoteStrategy (규칙 변경 투표)
+### 5.4 MeetingAttendanceVoteStrategy (정기 모임 참석 투표) ⭐ NEW
+
+```java
+package com.woorido.service.vote.strategy;
+
+import com.woorido.domain.meeting.Meeting;
+import com.woorido.domain.vote.Vote;
+import com.woorido.domain.vote.VoteType;
+import com.woorido.mapper.MeetingMapper;
+import com.woorido.mapper.VoteRecordMapper;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.UUID;
+
+@Slf4j
+@Component
+@RequiredArgsConstructor
+public class MeetingAttendanceVoteStrategy implements VoteApprovalStrategy {
+
+    private final MeetingMapper meetingMapper;
+    private final VoteRecordMapper voteRecordMapper;
+
+    @Override
+    public boolean supports(Vote vote) {
+        return vote.getType() == VoteType.MEETING_ATTENDANCE;
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void execute(Vote vote) {
+        log.info("정기 모임 참석 투표 승인 처리 시작: voteId={}, title={}",
+            vote.getId(), vote.getTitle());
+
+        // 1. 참석 인원 조회 (APPROVE 투표한 사람들)
+        List<String> attendeeIds = voteRecordMapper.selectUserIdsByVoteIdAndChoice(
+            vote.getId(), "APPROVE"
+        );
+
+        // 2. 정기 모임 레코드 생성
+        Meeting meeting = Meeting.builder()
+            .id(UUID.randomUUID().toString())
+            .gyeId(vote.getGyeId())
+            .voteId(vote.getId())
+            .title(vote.getTitle())
+            .description(vote.getDescription())
+            .scheduledAt(vote.getMeetingDate())  // 투표에서 전달된 날짜
+            .location(vote.getMeetingLocation())
+            .expectedAttendees(attendeeIds.size())
+            .status("CONFIRMED")
+            .createdBy(vote.getCreatedBy())
+            .createdAt(LocalDateTime.now())
+            .build();
+
+        meetingMapper.insert(meeting);
+
+        // 3. 참석자 등록
+        for (String userId : attendeeIds) {
+            meetingMapper.insertAttendee(meeting.getId(), userId, "CONFIRMED");
+        }
+
+        log.info("정기 모임 생성 완료: meetingId={}, attendees={}",
+            meeting.getId(), attendeeIds.size());
+    }
+}
+```
+
+### 5.5 RuleChangeVoteStrategy (규칙 변경 투표)
 
 ```java
 package com.woorido.service.vote.strategy;

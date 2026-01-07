@@ -440,11 +440,14 @@ public class TransactionService {
     }
 
     /**
-     * 보증금 환불 처리
-     * 챌린지 완주 시 호출
+     * 보증금 락 해제 처리
+     * 정상 탈퇴 시 호출 (미납 없는 경우)
+     * 
+     * ⚠️ 주의: 완주(Completion)는 1년 인증 마크이며 보증금과 무관합니다.
+     * 보증금 락은 오직 "정상 탈퇴" 시에만 해제됩니다.
      */
     @Transactional
-    public void refundDeposit(Long challengeId, Long userId) {
+    public void releaseDepositOnLeave(Long challengeId, Long userId) {
         // 1. 원래 보증금 조회
         Transaction depositTransaction = transactionMapper.selectDepositTransaction(
             challengeId, userId
@@ -454,19 +457,19 @@ public class TransactionService {
             throw new TransactionNotFoundException("Deposit not found");
         }
 
-        // 2. 환불 거래 생성
-        Transaction refundTransaction = Transaction.builder()
+        // 2. 보증금 락 해제 거래 생성
+        Transaction unlockTransaction = Transaction.builder()
             .challengeId(challengeId)
             .userId(userId)
-            .type("DEPOSIT_REFUND")
+            .type("DEPOSIT_UNLOCK")  // REFUND → UNLOCK으로 변경
             .amount(depositTransaction.getAmount())
             .status("COMPLETED")
             .relatedTransactionId(depositTransaction.getId())
             .build();
 
-        transactionMapper.insertTransaction(refundTransaction);
+        transactionMapper.insertTransaction(unlockTransaction);
 
-        log.info("Deposit refunded for user {} in challenge {}",
+        log.info("Deposit lock released for user {} leaving challenge {}",
             userId, challengeId);
     }
 }
@@ -788,6 +791,13 @@ import lombok.Data;
 import javax.validation.constraints.*;
 import java.math.BigDecimal;
 
+/**
+ * 챌린지 생성 요청 DTO
+ * 
+ * 용어 정의:
+ * - supportAmount: 월 서포트 (납입금)
+ * - depositLock: 보증금 락 (미납 충당용 예치금)
+ */
 @Data
 public class ChallengeCreateRequest {
 
@@ -802,17 +812,26 @@ public class ChallengeCreateRequest {
     @NotBlank(message = "카테고리는 필수입니다")
     private String category;
 
-    @NotNull(message = "참가비는 필수입니다")
-    @DecimalMin(value = "0", message = "참가비는 0 이상이어야 합니다")
-    private BigDecimal participationFee;
+    @NotNull(message = "서포트(월 납입금)는 필수입니다")
+    @DecimalMin(value = "10000", message = "서포트는 최소 10,000원입니다")
+    private BigDecimal supportAmount;  // participationFee → supportAmount
 
-    @NotNull(message = "보증금은 필수입니다")
-    @DecimalMin(value = "1000", message = "보증금은 최소 1000원입니다")
-    private BigDecimal deposit;
+    @NotNull(message = "보증금 락은 필수입니다")
+    @DecimalMin(value = "10000", message = "보증금 락은 서포트와 동일(1개월치)")
+    private BigDecimal depositLock;  // deposit → depositLock
 }
 
 // ChallengeResponse.java
 
+/**
+ * 챌린지 응답 DTO
+ * 
+ * 용어 정의:
+ * - supportAmount: 월 서포트 (납입금)
+ * - depositLock: 보증금 락
+ * - openBalance: 오픈 잔액 (챌린지 공동 자금)
+ * - followerCount: 팔로워 수 (멤버 수)
+ */
 @Data
 @Builder
 public class ChallengeResponse {
@@ -820,10 +839,10 @@ public class ChallengeResponse {
     private String title;
     private String description;
     private String category;
-    private BigDecimal participationFee;
-    private BigDecimal deposit;
-    private BigDecimal balance;
-    private int memberCount;
+    private BigDecimal supportAmount;      // participationFee → supportAmount
+    private BigDecimal depositLock;        // deposit → depositLock
+    private BigDecimal openBalance;        // balance → openBalance
+    private int followerCount;             // memberCount → followerCount
     private String status;
     private String leaderName;
     private LocalDateTime createdAt;
@@ -834,10 +853,10 @@ public class ChallengeResponse {
             .title(challenge.getTitle())
             .description(challenge.getDescription())
             .category(challenge.getCategory())
-            .participationFee(challenge.getParticipationFee())
-            .deposit(challenge.getDeposit())
-            .balance(challenge.getBalance())
-            .memberCount(challenge.getMembers() != null ? challenge.getMembers().size() : 0)
+            .supportAmount(challenge.getSupportAmount())
+            .depositLock(challenge.getDepositLock())
+            .openBalance(challenge.getOpenBalance())
+            .followerCount(challenge.getFollowers() != null ? challenge.getFollowers().size() : 0)
             .status(challenge.getStatus())
             .leaderName(challenge.getLeader() != null ? challenge.getLeader().getName() : null)
             .createdAt(challenge.getCreatedAt())
@@ -1111,6 +1130,780 @@ logging:
 
 ---
 
-**문서 버전**: 2.0
-**최종 수정**: 2025-01-07
+**문서 버전**: 3.0
+**최종 수정**: 2026-01-07
 **작성자**: AI-Assisted Development Team
+
+---
+
+## 11. 자동 서포트 납입 시스템 ⭐ NEW
+
+### 11.1 월간 자동 납입 스케줄러
+
+```java
+// AutoPaymentScheduler.java
+
+package com.woorido.scheduler;
+
+import com.woorido.domain.challenge.ChallengeMapper;
+import com.woorido.domain.member.GyeMemberMapper;
+import com.woorido.service.payment.PaymentService;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.stereotype.Component;
+
+@Slf4j
+@Component
+@RequiredArgsConstructor
+public class AutoPaymentScheduler {
+
+    private final GyeMemberMapper memberMapper;
+    private final PaymentService paymentService;
+
+    /**
+     * 매월 1일 00:00에 자동 서포트 납입 실행
+     */
+    @Scheduled(cron = "0 0 0 1 * *")
+    public void processMonthlySupport() {
+        log.info("=== 월간 자동 서포트 납입 시작 ===");
+
+        // 모든 활성 멤버 조회
+        List<GyeMember> activeMembers = memberMapper.selectActiveMembers();
+
+        for (GyeMember member : activeMembers) {
+            try {
+                paymentService.processAutoSupport(member);
+            } catch (Exception e) {
+                log.error("자동 납입 실패: memberId={}", member.getId(), e);
+            }
+        }
+
+        log.info("=== 월간 자동 서포트 납입 완료: 처리 {}건 ===", activeMembers.size());
+    }
+}
+```
+
+### 11.2 보증금 충당 및 권한 박탈 로직
+
+```java
+// PaymentService.java
+
+@Service
+@Slf4j
+@RequiredArgsConstructor
+public class PaymentService {
+
+    private final AccountMapper accountMapper;
+    private final TransactionMapper transactionMapper;
+    private final GyeMemberMapper memberMapper;
+    private final NotificationService notificationService;
+
+    /**
+     * 자동 서포트 납입 처리
+     * 1. 가용 크레딧으로 납입 시도
+     * 2. 부족 시 보증금에서 자동 납입
+     * 3. 보증금 사용 시 즉시 권한 박탈
+     */
+    @Transactional
+    public void processAutoSupport(GyeMember member) {
+        Account account = accountMapper.selectByUserIdForUpdate(member.getUserId());
+        Challenge challenge = challengeMapper.selectById(member.getChallengeId());
+        
+        BigDecimal supportAmount = challenge.getSupportAmount();
+
+        // 1. 가용 크레딧 확인
+        if (account.getCreditBalance().compareTo(supportAmount) >= 0) {
+            // 정상 납입
+            deductCredit(account, supportAmount, member.getChallengeId());
+            addToOpen(challenge, supportAmount);
+            log.info("정상 납입 완료: userId={}, amount={}", member.getUserId(), supportAmount);
+            return;
+        }
+
+        // 2. 보증금에서 자동 납입 (안심결제)
+        if (member.getDepositLockAmount().compareTo(supportAmount) >= 0) {
+            useDepositForSupport(member, supportAmount);
+            addToOpen(challenge, supportAmount);
+            
+            // ⚡ 즉시 권한 박탈
+            revokePrivileges(member);
+            
+            // ⚡ 즉시 알림 발송
+            notificationService.sendDepositUsedAlert(member.getUserId());
+            
+            log.warn("보증금 사용 납입: userId={}, 권한 박탈됨", member.getUserId());
+            return;
+        }
+
+        // 3. 보증금도 부족 - 이미 권한 박탈 상태
+        log.warn("납입 불가: userId={}, 보증금 부족", member.getUserId());
+    }
+
+    /**
+     * 권한 박탈: 정기 모임 참석 투표 불가
+     */
+    private void revokePrivileges(GyeMember member) {
+        member.setPrivilegeStatus("REVOKED");
+        member.setPrivilegeRevokedAt(LocalDateTime.now());
+        memberMapper.updatePrivilegeStatus(member);
+    }
+
+    /**
+     * 자동 탈퇴 체크 (2개월 경과 시)
+     */
+    @Scheduled(cron = "0 0 6 * * *")  // 매일 06:00
+    public void checkAutoLeave() {
+        LocalDateTime threshold = LocalDateTime.now().minusDays(60);
+        
+        List<GyeMember> revokedMembers = memberMapper.selectRevokedMembersBefore(threshold);
+        
+        for (GyeMember member : revokedMembers) {
+            processAutoLeave(member);
+        }
+    }
+
+    private void processAutoLeave(GyeMember member) {
+        member.setLeftAt(LocalDateTime.now());
+        member.setLeaveReason("AUTO_LEAVE_DEPOSIT_NOT_RECHARGED");
+        memberMapper.update(member);
+        
+        // 리더에게만 알림
+        notificationService.sendAutoLeaveNotificationToLeader(
+            member.getChallengeId(), 
+            member.getUserId()
+        );
+        
+        log.info("자동 탈퇴 처리: userId={}, challengeId={}", 
+            member.getUserId(), member.getChallengeId());
+    }
+}
+```
+
+### 11.3 충전 시 보증금 우선 복구
+
+```java
+// AccountService.java
+
+@Service
+@RequiredArgsConstructor
+public class AccountService {
+
+    /**
+     * 크레딧 충전 시 보증금 락 우선 복구
+     */
+    @Transactional
+    public ChargeResult chargeCredit(Long userId, BigDecimal amount) {
+        Account account = accountMapper.selectByUserIdForUpdate(userId);
+        
+        // 1. 보증금 미충족 챌린지 조회
+        List<GyeMember> deficitMembers = memberMapper.selectDepositDeficitMembers(userId);
+        
+        BigDecimal remaining = amount;
+        
+        // 2. 보증금 우선 복구
+        for (GyeMember member : deficitMembers) {
+            BigDecimal deficit = member.getRequiredDeposit()
+                .subtract(member.getDepositLockAmount());
+            
+            if (remaining.compareTo(deficit) >= 0) {
+                // 전액 복구
+                restoreDeposit(member, deficit);
+                restorePrivileges(member);  // 권한 복구
+                remaining = remaining.subtract(deficit);
+            } else {
+                // 부분 복구 (권한은 아직 복구 안됨)
+                restoreDeposit(member, remaining);
+                remaining = BigDecimal.ZERO;
+                break;
+            }
+        }
+        
+        // 3. 나머지는 가용 크레딧으로
+        account.setCreditBalance(account.getCreditBalance().add(remaining));
+        accountMapper.update(account);
+        
+        return ChargeResult.builder()
+            .depositRestored(amount.subtract(remaining))
+            .creditAdded(remaining)
+            .build();
+    }
+
+    private void restorePrivileges(GyeMember member) {
+        member.setPrivilegeStatus("ACTIVE");
+        member.setPrivilegeRevokedAt(null);
+        memberMapper.updatePrivilegeStatus(member);
+    }
+}
+```
+
+---
+
+## 12. 수수료 계산 시스템 ⭐ NEW
+
+### 12.1 수수료율 정책
+
+| 구분 | 월 서포트 | 수수료율 |
+|------|----------|---------|
+| 소액 | 10,000원 미만 | 1% |
+| 일반 | 10,000 ~ 200,000원 | 3% |
+| 고액 | 200,000원 초과 | 1.5% |
+
+### 12.2 수수료 계산 서비스
+
+```java
+// FeeCalculationService.java
+
+@Service
+public class FeeCalculationService {
+
+    private static final BigDecimal SMALL_THRESHOLD = new BigDecimal("10000");
+    private static final BigDecimal LARGE_THRESHOLD = new BigDecimal("200000");
+    
+    private static final BigDecimal SMALL_RATE = new BigDecimal("0.01");   // 1%
+    private static final BigDecimal NORMAL_RATE = new BigDecimal("0.03");  // 3%
+    private static final BigDecimal LARGE_RATE = new BigDecimal("0.015");  // 1.5%
+
+    public BigDecimal calculateFee(BigDecimal supportAmount) {
+        BigDecimal rate;
+        
+        if (supportAmount.compareTo(SMALL_THRESHOLD) < 0) {
+            rate = SMALL_RATE;
+        } else if (supportAmount.compareTo(LARGE_THRESHOLD) <= 0) {
+            rate = NORMAL_RATE;
+        } else {
+            rate = LARGE_RATE;
+        }
+        
+        return supportAmount.multiply(rate)
+            .setScale(0, RoundingMode.DOWN);  // 원 미만 절사
+    }
+}
+```
+
+---
+
+## 13. 정기 모임 관리 API ⭐ NEW
+
+### 13.1 Meeting 엔티티
+
+```java
+@Data
+@Builder
+public class Meeting {
+    private Long id;
+    private Long challengeId;
+    private Long voteId;           // 연결된 MEETING_ATTENDANCE 투표
+    private String title;
+    private String description;
+    private LocalDateTime meetingDate;
+    private String location;
+    private int expectedAttendees;
+    private String status;         // PLANNED, CONFIRMED, COMPLETED, CANCELLED
+    private Long createdBy;
+    private LocalDateTime createdAt;
+}
+```
+
+### 13.2 Meeting Controller
+
+```java
+@RestController
+@RequestMapping("/api/challenges/{challengeId}/meetings")
+@RequiredArgsConstructor
+public class MeetingController {
+
+    private final MeetingService meetingService;
+
+    /**
+     * 정기 모임 참석 투표 생성 (리더 전용)
+     * POST /api/challenges/{id}/meetings/vote
+     */
+    @PostMapping("/vote")
+    public ResponseEntity<VoteResponse> createMeetingVote(
+        @PathVariable Long challengeId,
+        @RequestBody @Valid CreateMeetingVoteRequest request,
+        @CurrentUser Long userId
+    ) {
+        return ResponseEntity.ok(
+            meetingService.createMeetingAttendanceVote(challengeId, request, userId)
+        );
+    }
+
+    /**
+     * 정기 모임 목록 조회
+     * GET /api/challenges/{id}/meetings
+     */
+    @GetMapping
+    public ResponseEntity<List<MeetingResponse>> getMeetings(
+        @PathVariable Long challengeId
+    ) {
+        return ResponseEntity.ok(meetingService.getMeetings(challengeId));
+    }
+
+    /**
+     * 참석 등록
+     * POST /api/meetings/{id}/attend
+     */
+    @PostMapping("/{meetingId}/attend")
+    public ResponseEntity<Void> registerAttendance(
+        @PathVariable Long meetingId,
+        @CurrentUser Long userId
+    ) {
+        meetingService.registerAttendance(meetingId, userId);
+        return ResponseEntity.ok().build();
+    }
+}
+```
+
+### 13.3 권한 체크 인터셉터
+
+```java
+// MeetingPrivilegeInterceptor.java
+
+@Component
+@RequiredArgsConstructor
+public class MeetingPrivilegeInterceptor implements HandlerInterceptor {
+
+    private final GyeMemberMapper memberMapper;
+
+    @Override
+    public boolean preHandle(HttpServletRequest request, ...) {
+        // MEETING_ATTENDANCE 투표 참여 시 권한 체크
+        Long userId = getCurrentUserId(request);
+        Long challengeId = extractChallengeId(request);
+        
+        GyeMember member = memberMapper.selectByUserAndChallenge(userId, challengeId);
+        
+        if (member == null) {
+            throw new UnauthorizedException("챌린지 멤버가 아닙니다.");
+        }
+        
+        if ("REVOKED".equals(member.getPrivilegeStatus())) {
+            throw new PrivilegeRevokedException(
+                "보증금 충전이 필요합니다. 정기 모임에 참석할 수 없습니다."
+            );
+        }
+        
+        return true;
+    }
+}
+```
+
+---
+
+## 14. Django 연동 상세 ⭐ NEW
+
+### 14.1 분석 API 호출
+
+```java
+// DjangoAnalyticsService.java
+
+@Service
+@RequiredArgsConstructor
+public class DjangoAnalyticsService {
+
+    private final WebClient djangoWebClient;
+
+    /**
+     * 월별 지출 통계 조회
+     */
+    public MonthlyStatsResponse getMonthlyStats(Long challengeId, List<Transaction> transactions) {
+        return djangoWebClient.post()
+            .uri("/api/analyze/monthly-stats")
+            .bodyValue(AnalyzeRequest.builder()
+                .challengeId(challengeId)
+                .transactions(transactions)
+                .build())
+            .retrieve()
+            .bodyToMono(MonthlyStatsResponse.class)
+            .block();
+    }
+
+    /**
+     * 카테고리별 비율 분석
+     */
+    public CategoryRatioResponse getCategoryRatio(Long challengeId, List<Transaction> transactions) {
+        return djangoWebClient.post()
+            .uri("/api/analyze/category-ratio")
+            .bodyValue(AnalyzeRequest.builder()
+                .challengeId(challengeId)
+                .transactions(transactions)
+                .build())
+            .retrieve()
+            .bodyToMono(CategoryRatioResponse.class)
+            .block();
+    }
+}
+```
+
+### 14.2 검색 API 호출 (Elasticsearch)
+
+```java
+// DjangoSearchService.java
+
+@Service
+@RequiredArgsConstructor
+public class DjangoSearchService {
+
+    private final WebClient djangoWebClient;
+
+    /**
+     * 챌린지 검색 (한글 형태소 분석)
+     */
+    public SearchResponse searchChallenges(String query, int page, int size) {
+        return djangoWebClient.get()
+            .uri(uriBuilder -> uriBuilder
+                .path("/api/search/challenges")
+                .queryParam("q", query)
+                .queryParam("page", page)
+                .queryParam("size", size)
+                .build())
+            .retrieve()
+            .bodyToMono(SearchResponse.class)
+            .block();
+    }
+
+    /**
+     * 개인화 추천 챌린지
+     */
+    public List<ChallengeRecommendation> getRecommendations(Long userId) {
+        return djangoWebClient.get()
+            .uri("/api/recommendations/challenges?userId=" + userId)
+            .retrieve()
+            .bodyToFlux(ChallengeRecommendation.class)
+            .collectList()
+            .block();
+    }
+}
+```
+
+---
+
+## 15. 디자인 패턴 적용 가이드 ⭐ NEW
+
+> WOORIDO Spring Boot 백엔드에는 **5가지 패턴**을 권장합니다.
+> - **Layered Architecture + DTO 패턴**: 기본 구조 (이미 적용됨)
+> - **Strategy 패턴**: 수수료 계산, 투표 승인
+> - **Visitor 패턴**: 결제 시스템, 알림 시스템
+> - **Factory 패턴**: 객체 생성 중앙화
+
+### 15.1 Strategy 패턴 - 수수료 계산 리팩토링
+
+**기존 코드 (if-else 분기):**
+```java
+// 문제: 수수료 정책 변경 시 FeeCalculationService 수정 필요
+public BigDecimal calculateFee(BigDecimal amount) {
+    if (amount.compareTo(SMALL_THRESHOLD) < 0) {
+        return amount.multiply(new BigDecimal("0.01"));
+    } else if (amount.compareTo(LARGE_THRESHOLD) <= 0) {
+        return amount.multiply(new BigDecimal("0.03"));
+    } else {
+        return amount.multiply(new BigDecimal("0.015"));
+    }
+}
+```
+
+**Strategy 패턴 적용:**
+```java
+// 1. Strategy 인터페이스
+public interface FeeStrategy {
+    boolean supports(BigDecimal amount);
+    BigDecimal calculate(BigDecimal amount);
+}
+
+// 2. 구체 Strategy 구현
+@Component
+@Order(1)
+public class SmallAmountFeeStrategy implements FeeStrategy {
+    private static final BigDecimal THRESHOLD = new BigDecimal("10000");
+    private static final BigDecimal RATE = new BigDecimal("0.01");  // 1%
+    
+    @Override
+    public boolean supports(BigDecimal amount) {
+        return amount.compareTo(THRESHOLD) < 0;
+    }
+    
+    @Override
+    public BigDecimal calculate(BigDecimal amount) {
+        return amount.multiply(RATE).setScale(0, RoundingMode.DOWN);
+    }
+}
+
+@Component
+@Order(2)
+public class NormalAmountFeeStrategy implements FeeStrategy {
+    private static final BigDecimal MIN = new BigDecimal("10000");
+    private static final BigDecimal MAX = new BigDecimal("200000");
+    private static final BigDecimal RATE = new BigDecimal("0.03");  // 3%
+    
+    @Override
+    public boolean supports(BigDecimal amount) {
+        return amount.compareTo(MIN) >= 0 && amount.compareTo(MAX) <= 0;
+    }
+    
+    @Override
+    public BigDecimal calculate(BigDecimal amount) {
+        return amount.multiply(RATE).setScale(0, RoundingMode.DOWN);
+    }
+}
+
+@Component
+@Order(3)
+public class LargeAmountFeeStrategy implements FeeStrategy {
+    private static final BigDecimal THRESHOLD = new BigDecimal("200000");
+    private static final BigDecimal RATE = new BigDecimal("0.015");  // 1.5%
+    
+    @Override
+    public boolean supports(BigDecimal amount) {
+        return amount.compareTo(THRESHOLD) > 0;
+    }
+    
+    @Override
+    public BigDecimal calculate(BigDecimal amount) {
+        return amount.multiply(RATE).setScale(0, RoundingMode.DOWN);
+    }
+}
+
+// 3. Context (Service)
+@Service
+@RequiredArgsConstructor
+public class FeeCalculationService {
+    private final List<FeeStrategy> strategies;  // Spring이 자동 주입
+    
+    public BigDecimal calculateFee(BigDecimal amount) {
+        return strategies.stream()
+            .filter(s -> s.supports(amount))
+            .findFirst()
+            .map(s -> s.calculate(amount))
+            .orElseThrow(() -> new IllegalStateException("No strategy found"));
+    }
+}
+```
+
+**효과:**
+- 새 수수료 정책 추가 시 Strategy 클래스만 추가
+- FeeCalculationService 수정 불필요 (OCP 준수)
+
+---
+
+### 15.2 Visitor 패턴 - 결제 시스템
+
+**적용 대상:** 결제 수단(Toss, 카카오페이, 계좌이체) × 연산(결제, 환불, 취소)
+
+```java
+// 1. Element 인터페이스 (결제 수단)
+public interface PaymentElement {
+    void accept(PaymentVisitor visitor);
+}
+
+// 2. 구체 Element (결제 수단별)
+@Component
+public class TossPayElement implements PaymentElement {
+    private final TossPayClient client;
+    
+    @Override
+    public void accept(PaymentVisitor visitor) {
+        visitor.visit(this);
+    }
+    
+    public PaymentResult process(PaymentRequest request) {
+        return client.requestPayment(request);
+    }
+    
+    public RefundResult refund(RefundRequest request) {
+        return client.requestRefund(request);
+    }
+}
+
+@Component
+public class KakaoPayElement implements PaymentElement {
+    private final KakaoPayClient client;
+    
+    @Override
+    public void accept(PaymentVisitor visitor) {
+        visitor.visit(this);
+    }
+    
+    // 카카오페이 전용 메서드들...
+}
+
+// 3. Visitor 인터페이스
+public interface PaymentVisitor {
+    void visit(TossPayElement element);
+    void visit(KakaoPayElement element);
+    void visit(BankTransferElement element);
+}
+
+// 4. 구체 Visitor (연산별)
+@Component
+public class ChargeVisitor implements PaymentVisitor {
+    @Override
+    public void visit(TossPayElement element) {
+        // 토스페이 충전 로직
+        element.process(buildRequest());
+    }
+    
+    @Override
+    public void visit(KakaoPayElement element) {
+        // 카카오페이 충전 로직
+    }
+    
+    @Override
+    public void visit(BankTransferElement element) {
+        // 계좌이체 충전 로직
+    }
+}
+
+@Component
+public class RefundVisitor implements PaymentVisitor {
+    @Override
+    public void visit(TossPayElement element) {
+        element.refund(buildRefundRequest());
+    }
+    // 다른 결제수단 환불 로직...
+}
+
+// 5. Factory로 생성 중앙화
+@Component
+@RequiredArgsConstructor
+public class PaymentFactory {
+    private final TossPayElement tossPay;
+    private final KakaoPayElement kakaoPay;
+    private final BankTransferElement bankTransfer;
+    
+    public PaymentElement create(String paymentMethod) {
+        return switch (paymentMethod) {
+            case "TOSS" -> tossPay;
+            case "KAKAO" -> kakaoPay;
+            case "BANK" -> bankTransfer;
+            default -> throw new IllegalArgumentException("Unknown: " + paymentMethod);
+        };
+    }
+}
+
+// 6. 사용 예시
+@Service
+@RequiredArgsConstructor
+public class PaymentService {
+    private final PaymentFactory paymentFactory;
+    private final ChargeVisitor chargeVisitor;
+    private final RefundVisitor refundVisitor;
+    
+    public void charge(String method, BigDecimal amount) {
+        PaymentElement element = paymentFactory.create(method);
+        element.accept(chargeVisitor);
+    }
+    
+    public void refund(String method, String transactionId) {
+        PaymentElement element = paymentFactory.create(method);
+        element.accept(refundVisitor);
+    }
+}
+```
+
+**확장 효과:**
+| 확장 시나리오 | 기존 방식 | Visitor 패턴 |
+|-------------|----------|-------------|
+| 새 결제수단 추가 | PaymentService 수정 | 새 Element 추가만 |
+| 새 연산 추가 (취소) | 모든 결제수단 코드 수정 | 새 Visitor 추가만 |
+
+---
+
+### 15.3 Factory 패턴 - VoteStrategy 생성
+
+```java
+// VoteStrategyFactory.java
+
+@Component
+@RequiredArgsConstructor
+public class VoteStrategyFactory {
+    private final ExpenseVoteStrategy expenseStrategy;
+    private final MeetingAttendanceVoteStrategy meetingStrategy;
+    private final KickVoteStrategy kickStrategy;
+    private final RuleChangeVoteStrategy ruleChangeStrategy;
+    
+    public VoteApprovalStrategy create(VoteType type) {
+        return switch (type) {
+            case EXPENSE -> expenseStrategy;
+            case MEETING_ATTENDANCE -> meetingStrategy;
+            case KICK -> kickStrategy;
+            case RULE_CHANGE -> ruleChangeStrategy;
+        };
+    }
+}
+
+// VoteApprovalService 리팩토링
+@Service
+@RequiredArgsConstructor
+public class VoteApprovalService {
+    private final VoteStrategyFactory strategyFactory;
+    
+    public void approveVote(Vote vote) {
+        VoteApprovalStrategy strategy = strategyFactory.create(vote.getType());
+        strategy.execute(vote);
+    }
+}
+```
+
+---
+
+### 15.4 DTO 패턴 - Java 17 Record 활용
+
+```java
+// 기존 (Lombok @Data)
+@Data
+public class ChallengeCreateRequest {
+    private String title;
+    private String description;
+    private BigDecimal supportAmount;
+}
+
+// Java 17 Record 적용
+public record ChallengeCreateRequest(
+    @NotBlank String title,
+    @Size(max = 1000) String description,
+    @DecimalMin("10000") BigDecimal supportAmount,
+    @DecimalMin("10000") BigDecimal depositLock
+) {
+    // 추가 검증 로직
+    public ChallengeCreateRequest {
+        if (depositLock.compareTo(supportAmount) != 0) {
+            throw new IllegalArgumentException("보증금은 서포트와 동일해야 합니다");
+        }
+    }
+}
+
+// Response DTO도 Record로
+public record ChallengeResponse(
+    Long id,
+    String title,
+    BigDecimal supportAmount,
+    BigDecimal openBalance,
+    int followerCount,
+    boolean isVerified
+) {
+    public static ChallengeResponse from(Challenge c) {
+        return new ChallengeResponse(
+            c.getId(), c.getTitle(), c.getSupportAmount(),
+            c.getOpenBalance(), c.getFollowers().size(), c.isVerified()
+        );
+    }
+}
+```
+
+**Record 장점:**
+- 코드량 **70% 감소** (getter/setter/equals/hashCode 자동)
+- **불변성 보장** (값 수정 불가)
+- Jackson 직렬화 **완벽 호환**
+
+---
+
+### 15.5 패턴 적용 효과 요약
+
+| 패턴 | 적용 대상 | 기대 효과 |
+|------|----------|----------|
+| **Strategy** | 수수료 계산, 투표 승인 | 새 정책 추가 시 기존 코드 수정 없음 |
+| **Visitor** | 결제/알림 시스템 | 새 결제수단/알림채널 추가 용이 |
+| **Factory** | Strategy/Element 생성 | 객체 생성 로직 중앙화 |
+| **Record** | 모든 DTO | 코드량 70% 감소, 불변성 보장 |

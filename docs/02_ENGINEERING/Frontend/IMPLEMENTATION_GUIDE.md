@@ -104,13 +104,14 @@ interface UserProfileResponse {
 
 // GET /api/users/me/account
 interface AccountResponse {
-  balance: number;          // 가용 잔액
-  lockedBalance: number;    // 락 잔액
-  total: number;            // 총 잔액
+  creditBalance: number;        // 가용 크레딧 (balance → creditBalance)
+  depositLock: number;          // 보증금 락 (lockedBalance → depositLock)
+  totalCredit: number;          // 총 크레딧 (total → totalCredit)
   locks: Array<{
-    groupId: string;
-    groupName: string;
-    amount: number;
+    challengeId: string;        // groupId → challengeId
+    challengeName: string;      // groupName → challengeName
+    supportAmount: number;      // 해당 챌린지의 월 서포트
+    lockedAmount: number;       // 잠긴 보증금 락 금액
     lockedAt: string;
   }>;
 }
@@ -194,23 +195,24 @@ interface CreateGroupResponse {
   createdAt: string;
 }
 
-// GET /api/groups/:id
-interface GroupDetailResponse {
+// GET /api/challenges/:id
+interface ChallengeDetailResponse {
   id: string;
   name: string;
   description: string;
   category: 'STUDY' | 'HOBBY' | 'SPORTS' | 'CULTURE' | 'ETC';
-  monthlyFee: number;       // 월 납입금
-  depositAmount: number;    // 보증금 (= monthlyFee)
-  maxMembers: number;
-  currentMembers: number;
-  balance: number;          // 계모임 금고 잔액
-  cpId: string;
-  cpNickname: string;
+  supportAmount: number;      // 월 서포트 (monthlyFee → supportAmount)
+  depositLock: number;        // 보증금 락 (depositAmount → depositLock)
+  maxFollowers: number;       // 최대 팔로워 수 (maxMembers → maxFollowers)
+  currentFollowers: number;   // 현재 팔로워 수 (currentMembers → currentFollowers)
+  openBalance: number;        // 오픈 잔액 (balance → openBalance)
+  leaderId: string;           // 리더 ID (cpId → leaderId)
+  leaderNickname: string;     // 리더 닉네임 (cpNickname → leaderNickname)
   imageUrl?: string;
-  status: 'recruiting' | 'active' | 'completed';
-  isMember: boolean;        // 현재 유저가 멤버인지
-  role?: 'cp' | 'member';   // 멤버인 경우 역할
+  status: 'recruiting' | 'active' | 'verified';  // completed → verified
+  isVerified: boolean;        // 완주 인증 여부
+  isFollower: boolean;        // 현재 유저가 팔로워인지 (isMember → isFollower)
+  role?: 'leader' | 'follower';   // cp → leader, member → follower
   createdAt: string;
 }
 
@@ -231,33 +233,35 @@ interface LeaveGroupRequest {
 }
 
 interface LeaveGroupResponse {
-  unlockedAmount: number;   // 반환된 보증금
-  newBalance: number;
+  unlockedDepositLock: number;   // 해제된 보증금 락 → 가용 크레딧으로 전환
+  newCreditBalance: number;      // 새 가용 크레딧 잔액
   leftAt: string;
 }
 
-// POST /api/groups/:id/complete (보증금 해제 - 완주, CP만)
-interface CompleteGroupRequest {
-  completedAt: string;
+// ⚠️ 완주(Completion) = 1년 인증 마크 (보증금과 무관)
+// 시스템이 자동으로 처리하며, 별도 API 호출 불필요
+// 기존 /api/groups/:id/complete API는 폐기됨
+
+// GET /api/challenges/:id/verification (완주 인증 상태 조회)
+interface VerificationStatusResponse {
+  challengeId: string;
+  isVerified: boolean;           // 1년 이상 운영 시 true
+  verifiedAt?: string;           // 인증 획득 시점
+  operationDays: number;         // 운영 일수
+  daysUntilVerification?: number; // 인증까지 남은 일수
 }
 
-interface CompleteGroupResponse {
-  completedMembers: Array<{
-    userId: string;
-    unlockedAmount: number;
-  }>;
-}
-
-// GET /api/my-groups (나의 모임)
+// GET /api/my-groups (나의 챌린지)
 interface MyGroupsResponse {
   groups: Array<{
     id: string;
     name: string;
-    role: 'cp' | 'member';
+    role: 'leader' | 'follower';  // cp → leader, member → follower
     thumbnail?: string;
-    status: 'active' | 'completed';
-    newPosts: number;       // 읽지 않은 글 수
-    pendingVotes: number;   // 미투표 건수
+    status: 'active' | 'verified';  // completed → verified
+    isVerified: boolean;          // 완주 인증 여부
+    newPosts: number;             // 읽지 않은 글 수
+    pendingVotes: number;         // 미투표 건수
   }>;
 }
 
