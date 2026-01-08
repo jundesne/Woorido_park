@@ -454,7 +454,7 @@ CREATE TABLE account_transactions (
   account_id UUID NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
 
   -- 트랜잭션 정보
-  type VARCHAR(20) NOT NULL CHECK (type IN ('CHARGE', 'WITHDRAW', 'LOCK', 'UNLOCK', 'TRANSFER')),
+  type VARCHAR(20) NOT NULL CHECK (type IN ('CHARGE', 'WITHDRAW', 'LOCK', 'UNLOCK', 'TRANSFER', 'ENTRY_FEE', 'SUPPORT')),  -- ⭐ ENTRY_FEE, SUPPORT 추가
   amount BIGINT NOT NULL,
 
   -- 잔액 스냅샷 (감사 추적)
@@ -487,7 +487,64 @@ CREATE INDEX idx_acct_tx_idempotency ON account_transactions(idempotency_key);
 CREATE INDEX idx_acct_tx_type ON account_transactions(type, created_at DESC);
 ```
 
-### 3.4 모임 (gye)
+### 3.4 유저 점수 (user_scores) ⭐ 신규
+
+> ⭐ **WRD-105 기반**: 점수 시스템 v2.0 Final
+> - 갱신 시점: 매월 1일 서포트 납입 시
+> - 점수 범위: 유저 전체 통합 점수 (챌린지별 분리 X)
+> - 연산: Django에서 계산 후 Spring Boot가 저장
+
+```sql
+CREATE TABLE user_scores (
+  id UUID PRIMARY KEY DEFAULT SYS_GUID(),
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+
+  -- 납입 관련 원본 데이터 (Spring에서 집계)
+  total_attendance_count NUMBER DEFAULT 0,       -- 총 모임 참석 횟수
+  total_payment_months NUMBER DEFAULT 0,         -- 총 납입 개월수 (모든 챌린지 합산)
+  total_overdue_count NUMBER DEFAULT 0,          -- 총 연체 횟수
+
+  -- 활동 관련 원본 데이터 (Spring에서 집계)
+  total_feed_count NUMBER DEFAULT 0,             -- 총 피드 작성 수
+  total_comment_count NUMBER DEFAULT 0,          -- 총 댓글 작성 수
+  total_like_count NUMBER DEFAULT 0,             -- 총 좋아요 수
+  total_leader_months NUMBER DEFAULT 0,          -- 총 리더 경험 개월수
+  total_report_received_count NUMBER DEFAULT 0,  -- 총 신고 당한 횟수
+  total_kick_count NUMBER DEFAULT 0,             -- 총 강퇴 당한 횟수
+
+  -- Django 연산 결과
+  payment_score DECIMAL(10,4) DEFAULT 0,         -- 납입 점수 (원본)
+  activity_score DECIMAL(10,4) DEFAULT 0,        -- 활동 점수 (원본)
+  total_score DECIMAL(10,4) DEFAULT 36.5,        -- 최종 점수 (36.5 + 납입×0.7 + 활동×0.15)
+
+  -- 갱신 정보
+  calculated_at TIMESTAMP DEFAULT SYSTIMESTAMP,  -- 마지막 연산 시점
+  calculated_month VARCHAR(7),                   -- 연산 기준월 (YYYY-MM)
+
+  -- 제약조건
+  CONSTRAINT uk_user_score UNIQUE (user_id),
+  CONSTRAINT chk_score_max CHECK (total_score <= 100)
+);
+
+CREATE INDEX idx_user_scores_total ON user_scores(total_score DESC);
+CREATE INDEX idx_user_scores_month ON user_scores(calculated_month);
+```
+
+**WRD-105 점수 공식:**
+```
+최종 점수 = 36.5 + (납입 점수 × 0.7) + (활동 점수 × 0.15)
+
+납입 점수 = (모임 참석 × 0.09) + (납입 개월 × 0.32) + (연체 × -1.5)
+활동 점수 = (피드 × 0.05) + (댓글 × 0.025) + (좋아요 × 0.006) 
+          + (리더 개월 × 0.45) + (신고 당함 × -0.6) + (강퇴 당함 × -4.0)
+```
+
+**컬럼 용어 매핑:**
+| ERD 컬럼명 | 프론트엔드/API 용어 |
+|-----------|-------------------|
+| `total_score` | `userScore` (유저 점수) |
+| `payment_score` | `paymentScore` (납입 점수 원본) |
+| `activity_score` | `activityScore` (활동 점수 원본) |
 
 > ⭐ **v2.1 업데이트**: 완주 인증(is_verified) 추가, 용어 매핑 주석 추가
 
@@ -501,10 +558,19 @@ CREATE TABLE gye (
   -- 모임장 (⭐ creator_id → leaderId 용어 매핑)
   creator_id UUID NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
 
+  -- ⭐ NEW: 부리더 및 리더 활동 추적 (리더 승계 시스템)
+  sub_leader_id UUID REFERENCES users(id),  -- 부리더 (점수 2위 자동 지정)
+  leader_last_active_at TIMESTAMP DEFAULT SYSTIMESTAMP,  -- 리더 최근 활동일
+
   -- 팔로워 관리 (동시성 제어) (⭐ members → followers 용어 매핑)
-  current_members NUMBER DEFAULT 0 NOT NULL,  -- → currentFollowers
+  current_members NUMBER DEFAULT 1 NOT NULL,  -- → currentFollowers (리더 포함)
+  min_members NUMBER DEFAULT 3 NOT NULL,  -- ⭐ NEW: 최소 인원 (기본 3명)
   max_members NUMBER NOT NULL,  -- → maxFollowers
   version BIGINT DEFAULT 0 NOT NULL,  -- Optimistic Lock
+
+  -- ⭐ NEW: 챌린지 상태 (모집 중 → 진행 중 자동 전환)
+  status VARCHAR(20) DEFAULT 'RECRUITING' CHECK (status IN ('RECRUITING', 'ACTIVE', 'PAUSED', 'CLOSED')),
+  activated_at TIMESTAMP,  -- ACTIVE 상태 전환 시점 (입회비 3개월 계산 기준)
 
   -- 재무 정보 (⭐ 용어 매핑)
   balance BIGINT DEFAULT 0 NOT NULL,  -- → openBalance (오픈 잔액)
@@ -544,14 +610,17 @@ CREATE INDEX idx_gye_category ON gye(category, created_at DESC);
 CREATE INDEX idx_gye_public ON gye(is_public, created_at DESC) WHERE deleted_at IS NULL;
 CREATE INDEX idx_gye_deleted ON gye(deleted_at DESC);
 CREATE INDEX idx_gye_verified ON gye(is_verified, created_at DESC);  -- ⭐ 완주 인증 챌린지 조회용
+CREATE INDEX idx_gye_inactive_leader ON gye(leader_last_active_at) WHERE deleted_at IS NULL;  -- ⭐ 리더 미활동 조회용
 ```
 
 **컬럼 용어 매핑:**
 | ERD 컬럼명 | 프론트엔드/API 용어 |
 |-----------|-------------------|
 | `creator_id` | `leaderId` (리더 ID) |
+| `sub_leader_id` | `subLeaderId` (부리더 ID, 점수 2위 자동 지정) |
+| `leader_last_active_at` | `leaderLastActiveAt` (리더 최근 활동일) |
 | `current_members` | `currentFollowers` (현재 팔로워 수) |
-| `balance` | `openBalance` (오픈 잔액) |
+| `balance` | `challengeAccountBalance` (챌린지 어카운트 잔액) |
 | `monthly_fee` | `supportAmount` (월 서포트) |
 | `deposit_amount` | `depositLock` (보증금 락) |
 | `is_verified` | `isVerified` (완주 인증) |
@@ -609,6 +678,8 @@ CREATE INDEX idx_members_revoked ON gye_members(privilege_status, privilege_revo
 
 ### 3.6 장부 (ledger_entries)
 
+> ⭐ **v2.2 업데이트**: P-028 정책 반영, PG 연동 사용처 자동 기록 컬럼 추가
+
 ```sql
 CREATE TABLE ledger_entries (
   id UUID PRIMARY KEY DEFAULT SYS_GUID(),
@@ -627,6 +698,17 @@ CREATE TABLE ledger_entries (
   -- 증빙 자료
   receipt_url VARCHAR(500),
 
+  -- ⭐ NEW: P-028 사용처 자동 기록 (PG 영수증 파싱, 토스페이/카카오페이 등 확장 가능)
+  merchant_name VARCHAR(100),       -- 상호명 (PG에서 자동 파싱, 수동 입력 불가)
+  merchant_category VARCHAR(50),    -- 업종 (식당, 카페, 숙박 등)
+  pg_provider VARCHAR(30),          -- PG사 (TOSSPAY, KAKAOPAY, NAVERPAY 등)
+  pg_approval_number VARCHAR(50),   -- PG 승인번호
+
+  -- 리더 메모 (수정 가능)
+  memo VARCHAR(500),
+  memo_updated_at TIMESTAMP,
+  memo_updated_by UUID REFERENCES users(id),
+
   -- 타임스탬프
   created_at TIMESTAMP DEFAULT SYSTIMESTAMP NOT NULL,
 
@@ -637,7 +719,16 @@ CREATE TABLE ledger_entries (
 CREATE INDEX idx_ledger_gye_created ON ledger_entries(gye_id, created_at DESC);
 CREATE INDEX idx_ledger_type ON ledger_entries(type, created_at DESC);
 CREATE INDEX idx_ledger_creator ON ledger_entries(created_by);
+CREATE INDEX idx_ledger_merchant ON ledger_entries(merchant_name);  -- ⭐ 사용처 검색용
 ```
+
+**컬럼 용어 매핑:**
+| ERD 컬럼명 | 프론트엔드/API 용어 |
+|-----------|-------------------|
+| `merchant_name` | `merchantName` (상호명, PG 자동 입력) |
+| `merchant_category` | `merchantCategory` (업종) |
+| `pg_provider` | `pgProvider` (PG사) |
+| `memo` | `memo` (리더 메모, 수정 가능) |
 
 ### 3.7 정기 모임 (meetings) ⭐ 신규
 
@@ -709,8 +800,8 @@ CREATE TABLE votes (
   gye_id UUID NOT NULL REFERENCES gye(id) ON DELETE CASCADE,
   created_by UUID NOT NULL REFERENCES users(id) ON DELETE SET NULL,
 
-  -- 투표 유형 (⭐ MEETING_ATTENDANCE 추가)
-  type VARCHAR(20) NOT NULL CHECK (type IN ('EXPENSE', 'KICK', 'RULE_CHANGE', 'MEETING_ATTENDANCE')),
+  -- 투표 유형 (⭐ LEADER_KICK 추가)
+  type VARCHAR(30) NOT NULL CHECK (type IN ('EXPENSE', 'KICK', 'RULE_CHANGE', 'MEETING_ATTENDANCE', 'LEADER_KICK', 'DISSOLVE')),  -- ⭐ DISSOLVE 추가
 
   -- 투표 내용
   title VARCHAR(200) NOT NULL,
