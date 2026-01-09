@@ -312,6 +312,7 @@ spring:
 | **spring-boot-starter-security** | 3.2.3 | 보안 |
 | **jjwt-api** | 0.12.3 | JWT 토큰 |
 | **spring-boot-starter-validation** | 3.2.3 | 입력 검증 |
+| **spring-retry** | 2.0.5 | 재시도 메커니즘 (외부 서비스 연동) |
 
 ### 5.3 build.gradle 예시
 
@@ -353,6 +354,10 @@ dependencies {
     implementation 'io.jsonwebtoken:jjwt-api:0.12.3'
     runtimeOnly 'io.jsonwebtoken:jjwt-impl:0.12.3'
     runtimeOnly 'io.jsonwebtoken:jjwt-jackson:0.12.3'
+
+    // Spring Retry (외부 서비스 연동 재시도)
+    implementation 'org.springframework.retry:spring-retry'
+    implementation 'org.springframework:spring-aspects'
 
     // Lombok
     compileOnly 'org.projectlombok:lombok'
@@ -407,6 +412,13 @@ django:
   api:
     base-url: http://localhost:8000
     timeout: 5000
+
+# Spring Retry 설정
+retry:
+  maxAttempts: 3
+  backoff:
+    delay: 1000
+    multiplier: 2
 ```
 
 ---

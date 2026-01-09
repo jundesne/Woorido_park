@@ -151,6 +151,18 @@
 
 ---
 
+## ENVIRONMENT_SETUP.md 변경 이력 (2026-01-09)
+
+| 항목 | 변경 내용 | 사유 |
+|------|----------|------|
+| Spring Retry | `spring-retry:2.0.5` 의존성 추가 | 외부 서비스(Django/ES/S3) 연동 시 일시적 장애 복원력 확보 |
+| build.gradle | spring-retry, spring-aspects 의존성 추가 | 선언적 재시도 어노테이션 (@Retryable) 지원 |
+| application.yml | retry 설정 섹션 추가 | maxAttempts: 3, backoff delay/multiplier 설정 |
+
+> **참고**: TossPay 결제 API는 idempotency_key로 별도 처리하므로 Spring Retry 대상에서 제외 (돈 복사 버그 방지)
+
+---
+
 ## 정책 변경 이력
 
 | 정책 코드 | 변경 내용 |
