@@ -1,12 +1,13 @@
-# WOORIDO ERD Specification v2.0
+# WOORIDO ERD Specification
 **백엔드 개발자용 데이터베이스 설계 명세서**
 
-**작성일**: 2026-01-05
+**작성일**: 2026-01-09
 **대상 DBMS**: Oracle 21c XE
 **ORM**: MyBatis 3.5.16
 **트랜잭션 관리**: Spring Boot 3.1.18 (@Transactional)
 
----
+> 📖 정책 기준: [POLICY_DEFINITION.md](../../01_PLANNING/Product/POLICY_DEFINITION.md)
+> 📋 변경 이력: [BACKLOG.md](../../BACKLOG.md)
 
 ## 📋 목차
 
@@ -399,6 +400,14 @@ CREATE TABLE users (
   failed_login_attempts NUMBER DEFAULT 0,
   locked_until TIMESTAMP,
 
+  -- P-030 ~ P-031: 계정 상태 관리 (신고/정지 시스템)
+  account_status VARCHAR(20) DEFAULT 'ACTIVE' CHECK (account_status IN ('ACTIVE', 'SUSPENDED', 'BANNED')),
+  suspended_at TIMESTAMP,
+  suspended_until TIMESTAMP,
+  suspension_reason VARCHAR(500),
+  warning_count NUMBER DEFAULT 0,
+  report_received_count NUMBER DEFAULT 0,
+
   -- 타임스탬프
   created_at TIMESTAMP DEFAULT SYSTIMESTAMP NOT NULL,
   updated_at TIMESTAMP DEFAULT SYSTIMESTAMP NOT NULL,
@@ -411,6 +420,8 @@ CREATE TABLE users (
 CREATE INDEX idx_users_email ON users(email);
 CREATE INDEX idx_users_phone ON users(phone);
 CREATE INDEX idx_users_created_at ON users(created_at DESC);
+CREATE INDEX idx_users_status ON users(account_status);
+CREATE INDEX idx_users_suspended ON users(suspended_until);
 ```
 
 ### 3.2 계좌 (accounts)
@@ -425,7 +436,7 @@ CREATE TABLE accounts (
   locked_balance BIGINT DEFAULT 0 NOT NULL,
 
   -- 동시성 제어
-  version BIGINT DEFAULT 0 NOT NULL,  -- ⭐ Optimistic Lock
+  version BIGINT DEFAULT 0 NOT NULL,  -- Optimistic Lock
 
   -- 계좌 정보
   bank_code VARCHAR(10),
@@ -454,7 +465,7 @@ CREATE TABLE account_transactions (
   account_id UUID NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
 
   -- 트랜잭션 정보
-  type VARCHAR(20) NOT NULL CHECK (type IN ('CHARGE', 'WITHDRAW', 'LOCK', 'UNLOCK', 'TRANSFER', 'ENTRY_FEE', 'SUPPORT')),  -- ⭐ ENTRY_FEE, SUPPORT 추가
+  type VARCHAR(20) NOT NULL CHECK (type IN ('CHARGE', 'WITHDRAW', 'LOCK', 'UNLOCK', 'TRANSFER', 'ENTRY_FEE', 'SUPPORT')),  -- ENTRY_FEE, SUPPORT 추가
   amount BIGINT NOT NULL,
 
   -- 잔액 스냅샷 (감사 추적)
@@ -464,7 +475,7 @@ CREATE TABLE account_transactions (
   locked_after BIGINT NOT NULL,
 
   -- 중복 방지 (Idempotency)
-  idempotency_key VARCHAR(100) UNIQUE,  -- ⭐ 중복 요청 검증
+  idempotency_key VARCHAR(100) UNIQUE,  -- 중복 요청 검증
 
   -- 관련 엔티티
   related_gye_id UUID REFERENCES gye(id),
@@ -487,9 +498,9 @@ CREATE INDEX idx_acct_tx_idempotency ON account_transactions(idempotency_key);
 CREATE INDEX idx_acct_tx_type ON account_transactions(type, created_at DESC);
 ```
 
-### 3.4 유저 점수 (user_scores) ⭐ 신규
+### 3.4 유저 점수 (user_scores)
 
-> ⭐ **WRD-105 기반**: 점수 시스템 v2.0 Final
+> **WRD-105 기반**: 점수 시스템 v2.0 Final
 > - 갱신 시점: 매월 1일 서포트 납입 시
 > - 점수 범위: 유저 전체 통합 점수 (챌린지별 분리 X)
 > - 연산: Django에서 계산 후 Spring Boot가 저장
@@ -546,7 +557,7 @@ CREATE INDEX idx_user_scores_month ON user_scores(calculated_month);
 | `payment_score` | `paymentScore` (납입 점수 원본) |
 | `activity_score` | `activityScore` (활동 점수 원본) |
 
-> ⭐ **v2.1 업데이트**: 완주 인증(is_verified) 추가, 용어 매핑 주석 추가
+> **P-046 참조**: 완주 인증(is_verified) 추가, 용어 매핑 주석 추가
 
 ```sql
 CREATE TABLE gye (
@@ -555,24 +566,24 @@ CREATE TABLE gye (
   description VARCHAR(2000),
   category VARCHAR(50) NOT NULL,
 
-  -- 모임장 (⭐ creator_id → leaderId 용어 매핑)
+  -- 모임장 (creator_id → leaderId 용어 매핑)
   creator_id UUID NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
 
-  -- ⭐ NEW: 부리더 및 리더 활동 추적 (리더 승계 시스템)
+  -- P-033 ~ P-035: 부리더 및 리더 활동 추적 (리더 승계 시스템)
   sub_leader_id UUID REFERENCES users(id),  -- 부리더 (점수 2위 자동 지정)
   leader_last_active_at TIMESTAMP DEFAULT SYSTIMESTAMP,  -- 리더 최근 활동일
 
-  -- 팔로워 관리 (동시성 제어) (⭐ members → followers 용어 매핑)
+  -- 팔로워 관리 (동시성 제어) (members → followers 용어 매핑)
   current_members NUMBER DEFAULT 1 NOT NULL,  -- → currentFollowers (리더 포함)
-  min_members NUMBER DEFAULT 3 NOT NULL,  -- ⭐ NEW: 최소 인원 (기본 3명)
+  min_members NUMBER DEFAULT 3 NOT NULL,  -- P-046: 최소 인원 (기본 3명)
   max_members NUMBER NOT NULL,  -- → maxFollowers
   version BIGINT DEFAULT 0 NOT NULL,  -- Optimistic Lock
 
-  -- ⭐ NEW: 챌린지 상태 (모집 중 → 진행 중 자동 전환)
+  -- P-046 ~ P-050: 챌린지 상태 (모집 중 → 진행 중 자동 전환)
   status VARCHAR(20) DEFAULT 'RECRUITING' CHECK (status IN ('RECRUITING', 'ACTIVE', 'PAUSED', 'CLOSED')),
   activated_at TIMESTAMP,  -- ACTIVE 상태 전환 시점 (입회비 3개월 계산 기준)
 
-  -- 재무 정보 (⭐ 용어 매핑)
+  -- 재무 정보 (용어 매핑)
   balance BIGINT DEFAULT 0 NOT NULL,  -- → openBalance (오픈 잔액)
   monthly_fee BIGINT NOT NULL,  -- → supportAmount (월 서포트)
   deposit_amount BIGINT NOT NULL,  -- → depositLock (보증금 락)
@@ -581,7 +592,7 @@ CREATE TABLE gye (
   is_public CHAR(1) DEFAULT 'Y' CHECK (is_public IN ('Y', 'N')),
   join_approval_required CHAR(1) DEFAULT 'N' CHECK (join_approval_required IN ('Y', 'N')),
 
-  -- ⭐ NEW: 완주 인증 시스템 (1년 운영 시 부여)
+  -- P-026 ~ P-028: 완주 인증 시스템 (1년 운영 시 부여)
   is_verified CHAR(1) DEFAULT 'N' CHECK (is_verified IN ('Y', 'N')),
   verified_at TIMESTAMP,  -- 완주 인증 시점
 
@@ -609,8 +620,8 @@ CREATE INDEX idx_gye_creator ON gye(creator_id);
 CREATE INDEX idx_gye_category ON gye(category, created_at DESC);
 CREATE INDEX idx_gye_public ON gye(is_public, created_at DESC) WHERE deleted_at IS NULL;
 CREATE INDEX idx_gye_deleted ON gye(deleted_at DESC);
-CREATE INDEX idx_gye_verified ON gye(is_verified, created_at DESC);  -- ⭐ 완주 인증 챌린지 조회용
-CREATE INDEX idx_gye_inactive_leader ON gye(leader_last_active_at) WHERE deleted_at IS NULL;  -- ⭐ 리더 미활동 조회용
+CREATE INDEX idx_gye_verified ON gye(is_verified, created_at DESC);  -- 완주 인증 챌린지 조회용
+CREATE INDEX idx_gye_inactive_leader ON gye(leader_last_active_at) WHERE deleted_at IS NULL;  -- 리더 미활동 조회용
 ```
 
 **컬럼 용어 매핑:**
@@ -627,7 +638,7 @@ CREATE INDEX idx_gye_inactive_leader ON gye(leader_last_active_at) WHERE deleted
 
 ### 3.5 모임 회원 (gye_members)
 
-> ⭐ **v2.1 업데이트**: 권한 박탈/복구 기능 추가
+> **P-018 ~ P-021 참조**: 권한 박탈/복구 기능
 
 ```sql
 CREATE TABLE gye_members (
@@ -635,27 +646,27 @@ CREATE TABLE gye_members (
   gye_id UUID NOT NULL REFERENCES gye(id) ON DELETE CASCADE,
   user_id UUID NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
 
-  -- 역할 (⭐ MEMBER → FOLLOWER 용어 변경)
+  -- 역할 (MEMBER → FOLLOWER 용어 변경)
   role VARCHAR(20) DEFAULT 'FOLLOWER' CHECK (role IN ('LEADER', 'MANAGER', 'FOLLOWER')),
 
-  -- 보증금 락 정보 (⭐ deposit → depositLock 용어 매핑)
+  -- 보증금 락 정보 (deposit → depositLock 용어 매핑)
   deposit_paid CHAR(1) DEFAULT 'N' CHECK (deposit_paid IN ('Y', 'N')),
   deposit_paid_at TIMESTAMP,
   deposit_locked_at TIMESTAMP,  -- 보증금 락 시점
   deposit_unlocked_at TIMESTAMP,  -- 보증금 락 해제 시점
 
-  -- ⭐ NEW: 권한 박탈 시스템 (보증금 충당 시)
+  -- P-018 ~ P-021: 권한 박탈 시스템 (보증금 충당 시)
   privilege_status VARCHAR(20) DEFAULT 'ACTIVE' CHECK (privilege_status IN ('ACTIVE', 'REVOKED')),
   privilege_revoked_at TIMESTAMP,  -- 권한 박탈 시점 (자동 탈퇴 60일 카운트 기준)
 
-  -- 서포트 납부 상태 (⭐ fee → support 용어 매핑)
+  -- 서포트 납부 상태 (fee → support 용어 매핑)
   last_support_paid_at TIMESTAMP,  -- last_fee_paid_at → last_support_paid_at
   total_support_paid BIGINT DEFAULT 0 NOT NULL,  -- total_fees_paid → total_support_paid
 
   -- 타임스탬프
   joined_at TIMESTAMP DEFAULT SYSTIMESTAMP NOT NULL,
   left_at TIMESTAMP,
-  leave_reason VARCHAR(50),  -- ⭐ NEW: 탈퇴 사유 (NORMAL, AUTO_LEAVE_DEPOSIT_NOT_RECHARGED, KICKED)
+  leave_reason VARCHAR(50),  -- 탈퇴 사유 (NORMAL, AUTO_LEAVE_DEPOSIT_NOT_RECHARGED, KICKED)
 
   -- 제약조건
   CONSTRAINT uk_gye_user UNIQUE (gye_id, user_id)
@@ -666,7 +677,7 @@ CREATE INDEX idx_members_gye ON gye_members(gye_id, joined_at DESC);
 CREATE INDEX idx_members_user ON gye_members(user_id, joined_at DESC);
 CREATE INDEX idx_members_active ON gye_members(gye_id) WHERE left_at IS NULL;
 CREATE INDEX idx_members_revoked ON gye_members(privilege_status, privilege_revoked_at) 
-  WHERE privilege_status = 'REVOKED';  -- ⭐ 자동 탈퇴 대상 조회용
+  WHERE privilege_status = 'REVOKED';  -- P-022: 자동 탈퇴 대상 조회용
 ```
 
 **컬럼 용어 매핑:**
@@ -678,7 +689,7 @@ CREATE INDEX idx_members_revoked ON gye_members(privilege_status, privilege_revo
 
 ### 3.6 장부 (ledger_entries)
 
-> ⭐ **v2.2 업데이트**: P-028 정책 반영, PG 연동 사용처 자동 기록 컬럼 추가
+> **P-029 참조**: PG 연동 사용처 자동 기록
 
 ```sql
 CREATE TABLE ledger_entries (
@@ -698,7 +709,7 @@ CREATE TABLE ledger_entries (
   -- 증빙 자료
   receipt_url VARCHAR(500),
 
-  -- ⭐ NEW: P-028 사용처 자동 기록 (PG 영수증 파싱, 토스페이/카카오페이 등 확장 가능)
+  -- P-029: 사용처 자동 기록 (PG 영수증 파싱, 토스페이/카카오페이 등 확장 가능)
   merchant_name VARCHAR(100),       -- 상호명 (PG에서 자동 파싱, 수동 입력 불가)
   merchant_category VARCHAR(50),    -- 업종 (식당, 카페, 숙박 등)
   pg_provider VARCHAR(30),          -- PG사 (TOSSPAY, KAKAOPAY, NAVERPAY 등)
@@ -719,7 +730,7 @@ CREATE TABLE ledger_entries (
 CREATE INDEX idx_ledger_gye_created ON ledger_entries(gye_id, created_at DESC);
 CREATE INDEX idx_ledger_type ON ledger_entries(type, created_at DESC);
 CREATE INDEX idx_ledger_creator ON ledger_entries(created_by);
-CREATE INDEX idx_ledger_merchant ON ledger_entries(merchant_name);  -- ⭐ 사용처 검색용
+CREATE INDEX idx_ledger_merchant ON ledger_entries(merchant_name);  -- 사용처 검색용
 ```
 
 **컬럼 용어 매핑:**
@@ -730,7 +741,7 @@ CREATE INDEX idx_ledger_merchant ON ledger_entries(merchant_name);  -- ⭐ 사�
 | `pg_provider` | `pgProvider` (PG사) |
 | `memo` | `memo` (리더 메모, 수정 가능) |
 
-### 3.7 정기 모임 (meetings) ⭐ 신규
+### 3.7 정기 모임 (meetings)
 
 > **핵심 규칙**: 과반수 이상 참석해야만 모임 개최 (계주 먹튀 방지)
 > 
@@ -767,7 +778,7 @@ CREATE INDEX idx_meetings_vote ON meetings(vote_id);
 CREATE INDEX idx_meetings_status ON meetings(status, meeting_date);
 ```
 
-### 3.8 모임 참석자 (meeting_attendees) ⭐ 신규
+### 3.8 모임 참석자 (meeting_attendees)
 
 > **핵심 규칙**: 해당 모임에 참석한 멤버만 모임 관련 지출 투표에 참여 가능
 
@@ -800,8 +811,8 @@ CREATE TABLE votes (
   gye_id UUID NOT NULL REFERENCES gye(id) ON DELETE CASCADE,
   created_by UUID NOT NULL REFERENCES users(id) ON DELETE SET NULL,
 
-  -- 투표 유형 (⭐ LEADER_KICK 추가)
-  type VARCHAR(30) NOT NULL CHECK (type IN ('EXPENSE', 'KICK', 'RULE_CHANGE', 'MEETING_ATTENDANCE', 'LEADER_KICK', 'DISSOLVE')),  -- ⭐ DISSOLVE 추가
+  -- 투표 유형 (P-037 ~ P-041: RULE_CHANGE 제거 - MVP 범위 외)
+  type VARCHAR(30) NOT NULL CHECK (type IN ('EXPENSE', 'KICK', 'MEETING_ATTENDANCE', 'LEADER_KICK', 'DISSOLVE')),
 
   -- 투표 내용
   title VARCHAR(200) NOT NULL,
@@ -809,7 +820,7 @@ CREATE TABLE votes (
   amount BIGINT,  -- EXPENSE 타입인 경우 필수
   target_user_id UUID REFERENCES users(id),  -- KICK 타입인 경우 필수
 
-  -- 정기 모임 관련 (⭐ 신규)
+  -- 정기 모임 관련 (P-042: 모임 관련 지출)
   meeting_id UUID REFERENCES meetings(id),  -- EXPENSE일 때 모임 관련 지출인 경우: 참석자만 투표 가능
   meeting_title VARCHAR(200),  -- MEETING_ATTENDANCE일 때 모임 제목
   meeting_date TIMESTAMP,  -- MEETING_ATTENDANCE일 때 모임 날짜
@@ -823,7 +834,7 @@ CREATE TABLE votes (
   approved_at TIMESTAMP,
 
   -- 장부 연동 (원자성 보장, EXPENSE 타입만 사용)
-  ledger_entry_id UUID REFERENCES ledger_entries(id),  -- ⭐ 투표-장부 연결
+  ledger_entry_id UUID REFERENCES ledger_entries(id),  -- 투표-장부 연결
   ledger_status VARCHAR(20) DEFAULT 'PENDING' CHECK (ledger_status IN ('PENDING', 'RECORDED', 'FAILED')),
 
   -- 타임스탬프
@@ -861,7 +872,7 @@ CREATE TABLE vote_records (
   vote_id UUID NOT NULL REFERENCES votes(id) ON DELETE CASCADE,
   user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
 
-  -- 투표 선택 (⭐ ATTEND/ABSENT 추가: 정기 모임 참석 투표용)
+  -- 투표 선택 (P-039: ATTEND/ABSENT 추가 - 정기 모임 참석 투표용)
   choice VARCHAR(20) NOT NULL CHECK (choice IN ('APPROVE', 'REJECT', 'ATTEND', 'ABSENT')),
   comment VARCHAR(500),
 
@@ -1010,6 +1021,63 @@ CREATE TABLE notifications (
 
 CREATE INDEX idx_notifications_user_created ON notifications(user_id, created_at DESC);
 CREATE INDEX idx_notifications_unread ON notifications(user_id, is_read, created_at DESC);
+```
+
+### 3.15 신고 (reports)
+
+> **P-031, P-032 정책 지원**: 신고 누적 시스템 및 허위 신고 처리
+> - 1계정 1회 카운팅 (uk_reporter_entity 제약조건)
+> - 20회 누적 시 자동 일시정지 (스프링 배치에서 처리)
+
+```sql
+CREATE TABLE reports (
+  id UUID PRIMARY KEY DEFAULT SYS_GUID(),
+  reporter_user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  reported_user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+
+  -- 신고 대상 (다형성 참조)
+  reported_entity_type VARCHAR(20) NOT NULL CHECK (reported_entity_type IN ('USER', 'POST', 'COMMENT')),
+  reported_entity_id UUID,  -- POST/COMMENT ID (USER 신고 시 NULL)
+
+  -- 신고 내용
+  reason_category VARCHAR(50) NOT NULL,  -- SPAM, ABUSE, FRAUD, INAPPROPRIATE 등
+  reason_detail VARCHAR(500),
+
+  -- 처리 상태
+  status VARCHAR(20) DEFAULT 'PENDING' CHECK (status IN ('PENDING', 'CONFIRMED', 'REJECTED', 'FALSE_REPORT')),
+  reviewed_at TIMESTAMP,
+  reviewed_by UUID REFERENCES users(id),
+  admin_note VARCHAR(500),
+
+  -- 타임스탬프
+  created_at TIMESTAMP DEFAULT SYSTIMESTAMP NOT NULL,
+
+  -- 제약조건: 동일 신고자가 동일 대상을 중복 신고 불가
+  CONSTRAINT uk_reporter_entity UNIQUE (reporter_user_id, reported_entity_type, COALESCE(reported_entity_id, reported_user_id))
+);
+
+-- 인덱스 (JOIN/GROUP BY 최적화)
+CREATE INDEX idx_reports_reporter ON reports(reporter_user_id, created_at DESC);
+CREATE INDEX idx_reports_reported_user ON reports(reported_user_id, status);
+CREATE INDEX idx_reports_status ON reports(status, created_at DESC);
+CREATE INDEX idx_reports_entity ON reports(reported_entity_type, reported_entity_id);
+```
+
+**REST API 쿼리 예시:**
+```sql
+-- 특정 유저에 대한 신고 횟수 (GROUP BY)
+SELECT reported_user_id, COUNT(*) as report_count
+FROM reports
+WHERE status = 'CONFIRMED'
+GROUP BY reported_user_id
+HAVING COUNT(*) >= 20;
+
+-- 내가 한 신고 목록 (JOIN)
+SELECT r.*, u.name as reported_user_name
+FROM reports r
+JOIN users u ON r.reported_user_id = u.id
+WHERE r.reporter_user_id = #{userId}
+ORDER BY r.created_at DESC;
 ```
 
 ---
@@ -1824,7 +1892,7 @@ def detect_anomaly(request):
 
 ---
 
-## 7. 관리자 CMS 테이블 ⭐ NEW (v2.1)
+## 7. 관리자 CMS 테이블
 
 > 플랫폼 운영을 위한 관리자 전용 테이블
 
@@ -1983,20 +2051,7 @@ CREATE INDEX idx_admin_logs_created ON admin_logs(created_at DESC);
 | Counter Drift | Atomic Operations | posts |
 | Missing CASCADE | Explicit ON DELETE | 모든 FK |
 
-### v2.1 변경사항
 
-| 테이블 | 변경 내용 |
-|--------|---------|
-| **gye** | `is_verified`, `verified_at` 추가, 용어 매핑 주석 |
-| **gye_members** | `privilege_status`, `privilege_revoked_at`, `leave_reason` 추가, 역할 FOLLOWER로 변경 |
-| **admins** | ⭐ 신규 - 관리자 계정 |
-| **fee_policies** | ⭐ 신규 - 수수료 정책 |
-| **reports** | ⭐ 신규 - 신고 관리 |
-| **admin_logs** | ⭐ 신규 - 감사 추적 |
-
----
-
-**문서 버전**: v2.1
-**최종 수정**: 2026-01-08
+**최종 수정**: 2026-01-09
 **작성자**: AI-Assisted Development Team
 **검토 필요**: Spring Boot 팀, Oracle DBA

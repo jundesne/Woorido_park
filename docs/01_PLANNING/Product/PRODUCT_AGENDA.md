@@ -1,15 +1,11 @@
 # WOORIDO 프로덕트 아젠다 (Product Agenda)
 
 > **Project:** WOORIDO - 커뮤니티 기반 챌린지 플랫폼 (구 계모임 플랫폼)
-> **Version:** v4.0 - AI-Accelerated Development Edition
-> **Last Updated:** 2026-01-07
-> **Status:** **49 Days to Demo Day** ⚡ AI-Powered Sprint
+> **Last Updated:** 2026-01-09
 >
-> **CRITICAL DEADLINE: 2026년 2월 25일 (공식 시연)**
-> - 현재: 2026-01-07
-> - 남은 시간: **49일 (약 7주)**
-> - **AI 도입 효과: 57일 일정 → 19일 개발 완료 예정 (67% 단축)**
-> - 시연 형식: **라이브 데모 (Live Demo)**
+> 📅 개발 일정 및 Demo Day 정보: [SCHEDULE.md](../../SCHEDULE.md)
+> 📋 변경 이력: [BACKLOG.md](../../BACKLOG.md)
+> 📖 정책 기준: [POLICY_DEFINITION.md](./POLICY_DEFINITION.md)
 
 ---
 
@@ -137,7 +133,7 @@
 | **충전 방법** | 토스페이 API (MVP), 이후 카드/계좌이체 확장 |
 | **최소 충전** | 10,000원 |
 | **최대 충전** | 1,000,000원 |
-| **충전 수수료** | 없음 (PG 비용 플랫폼 부담) |
+| **충전 수수료** | 금액별 차등 부과 (2.3 참조) |
 | **출금** | 가용 잔액 전액, 언제든 가능 |
 
 ### 2.2 챌린지(계모임) 가입 규칙
@@ -192,13 +188,15 @@
 
 **향후 조정 가능**: 공식에 문제 발견 시 수정 예정
 
-### 2.3 수수료 모델
+### 2.3 수수료 모델 (충전 시 부과)
 
-| 구분 | 월 서포트 | 수수료율 | 예시 |
+> 크레딧 충전 시 아래 수수료가 부과됩니다.
+
+| 구분 | 충전 금액 | 수수료율 | 예시 |
 |------|----------|---------|------|
-| **소액** | 10,000원 미만 | 1% | 5,000원 → 50원 |
-| **일반** | 10,000~200,000원 | 3% | 100,000원 → 3,000원 |
-| **고액** | 200,000원 초과 | 1.5% | 500,000원 → 7,500원 |
+| **소액** | 10,000원 미만 | 1% | 5,000원 충전 → 50원 |
+| **일반** | 10,000~200,000원 | 3% | 100,000원 충전 → 3,000원 |
+| **고액** | 200,000원 초과 | 1.5% | 500,000원 충전 → 7,500원 |
 
 ### 2.4 보증금 락 시스템 (Deposit Lock)
 
@@ -228,6 +226,13 @@
  └─ ✅ 피드 열람/작성은 가능
  └─ ✅ 서포트 납입 여부는 체크 불필요 (권한 없으니까)
 
+[7일 경과 시]
+ └─ 예정 모임 전체 자동 제외
+
+[8~60일 사이 충전 시] ⭐ v1.4 추가
+ └─ 충전 시 권한 즉시 복구
+ └─ 단, 모임은 재등록 필요 (7일 경과로 자동 제외된 상태)
+
 [자동 탈퇴 조건]
  └─ 보증금 사용 후 2개월(60일) 경과 + 미충전 상태 유지
  └─ → 자동 탈퇴 처리 (리더에게만 알림)
@@ -251,7 +256,7 @@
 
 ---
 
-### 2.5 챌린지 상태 시스템 ⭐ 신규
+### 2.5 챌린지 상태 시스템
 
 > 챌린지는 상태에 따라 다른 규칙이 적용됩니다.
 
@@ -315,7 +320,7 @@
 
 ---
 
-### 2.6 유저 점수 시스템 ⭐ 신규
+### 2.6 유저 점수 시스템
 
 > WRD-105 기반 점수 시스템 v2.0 Final
 > 리더 승계 및 프로필 표시에 사용됩니다.
@@ -333,7 +338,7 @@
 
 | 항목 | 점수 | 설명 |
 |------|------|------|
-| 모임 참석 | +0.09점/회 | 오프라인/온라인 모임 참석 |
+| 모임 참석 | +0.09점/회 | **ATTENDED 상태만 반영** (등록만 한 경우 미인정) |
 | 납입 개월 | +0.32점/월 | 정상 납입 완료 기준 |
 | 연체 | -1.5점/회 | 납입 기한 초과 시 |
 
@@ -360,7 +365,7 @@
 
 ---
 
-### 2.7 리더 승계 시스템 ⭐ 신규
+### 2.7 리더 승계 시스템
 
 > 리더가 미활동 시 팔로워가 리더 강퇴를 요청할 수 있습니다.
 
@@ -386,7 +391,7 @@
 
 ---
 
-### 2.8 장부 사용처 자동 기록 ⭐ 신규
+### 2.8 장부 사용처 자동 기록
 
 > P-028 정책에 따라 PG 결제 시 사용처가 자동 기록됩니다.
 
@@ -576,7 +581,7 @@ Django → Spring Boot → Frontend (차트 데이터)
 | **7** | **추천 (Django + ES)** | 2개 | - | 2일 | New |
 | | **총 API** | **51개** | **57일** | **19일** | **67%** |
 
-### 신규 추가: 정기 모임 (Meetings) 기능
+### 정기 모임 (Meetings) 기능
 
 **배경**: 챌린지(계모임)의 핵심 가치는 "실제 만남"
 - 챌린지 잔액의 주요 지출처 = 정기 모임 대관료, 식비 등
@@ -759,7 +764,7 @@ DELETE /api/meetings/{id}/attend           # 참석 취소
 [신고 누적 시스템]
 신고 접수 (리더 또는 팔로워)
   ↓
-신고 3건 누적
+신고 20회 누적
   ↓
 자동 일시정지 (7일)
   ↓
@@ -770,213 +775,9 @@ DELETE /api/meetings/{id}/attend           # 참석 취소
 
 ---
 
-## [6] AI 가속 개발 일정 (19일 Sprint)
+## [6] 개발 일정
 
-### 전체 일정 개요 (AI 반영)
-
-```
-1월 7일 ~ 1월 11일 (5일): 환경 세팅 + SNS 기초
-   ↓
-1월 12일 ~ 1월 17일 (6일): SNS 완성 + 챌린지 가입
-   ↓
-1월 18일 ~ 1월 22일 (5일): 장부/분석 + 투표/모임
-   ↓
-1월 23일 ~ 1월 25일 (3일): 검색/추천 (Django + ES)
-   ↓
-1월 26일 ~ 2월 7일 (13일): 통합 테스트 + 버그 수정 (여유)
-   ↓
-2월 8일 ~ 2월 20일 (13일): 시연 리허설 + 최종 점검
-   ↓
-2월 21일 ~ 2월 25일 (5일): 최종 안정화
-   ↓
-2월 25일: 🚀 DEMO DAY
-```
-
-**AI 개발 효율**:
-- 전통 개발: 57일
-- AI 도구 활용: 19일 (코어 개발)
-- 단축률: 67%
-- 버퍼 시간: 30일 (테스트/리허설)
-
-### Phase 1: 환경 세팅 (Day 1-5) - 1/7~1/11
-
-**목표:** Spring Boot + Django + Oracle + Elasticsearch 세팅
-
-**할 일:**
-- [ ] Spring Boot 프로젝트 초기화 (Claude Code)
-- [ ] Oracle 21c XE Docker 설치 및 실행
-- [ ] **Django 프로젝트 초기화 + pandas/Elasticsearch 설치**
-- [ ] **Elasticsearch 8.x Docker + 한글 분석기 (nori) 설정**
-- [ ] **Spring Boot ↔ Django HTTP 통신 테스트**
-- [ ] React + TypeScript 프로젝트 세팅 (Vite)
-- [ ] JWT 인증 기본 구현 (Claude Code)
-- [ ] ERD 설계 → DDL 생성 (Claude Code)
-
-**Django 세팅:**
-```bash
-django-admin startproject woorido_analytics
-pip install numpy pandas djangorestframework elasticsearch
-```
-
-**Elasticsearch 세팅:**
-```bash
-docker run -d -p 9200:9200 \
-  -e "discovery.type=single-node" \
-  -e "ES_JAVA_OPTS=-Xms2g -Xmx2g" \
-  elasticsearch:8.11.0
-
-# 한글 분석기 설치 (nori)
-docker exec -it es bin/elasticsearch-plugin install analysis-nori
-```
-
-**Checkpoint (1/11):**
-- ✅ 개발 환경 100% 작동
-- ✅ Spring Boot → Django Hello World 통신 성공
-- ✅ Elasticsearch 한글 검색 테스트 성공
-
----
-
-### Phase 2: SNS + 챌린지 (Day 6-11) - 1/12~1/17
-
-**목표:** SNS 완성 + 챌린지 가입 (입회비 계산 포함)
-
-**Backend (Spring Boot):**
-- [ ] 피드 CRUD API (Claude Code)
-- [ ] 댓글/대댓글 API
-- [ ] 좋아요 토글 API
-- [ ] 공지사항 핀 고정 API
-- [ ] 이미지 업로드 S3
-- [ ] 챌린지 CRUD API
-- [ ] **입회비 계산 로직** (Claude Code)
-  ```java
-  BigDecimal entryFee = balance.divide(
-    BigDecimal.valueOf(memberCount - 1),
-    0, RoundingMode.FLOOR
-  );
-  ```
-- [ ] 가입 시 보증금 + 입회비 차감
-- [ ] 어카운트 충전 API (토스페이 Mock)
-
-**Frontend (React):**
-- [ ] 피드 목록 UI (v0.dev)
-- [ ] 피드 작성 폼 (Cursor)
-- [ ] 댓글 컴포넌트 (v0.dev)
-- [ ] 챌린지 상세 페이지
-- [ ] 가입 확인 모달 (입회비 표시)
-
-**Checkpoint (1/17):**
-- ✅ 피드 작성 → 댓글 → 좋아요 작동
-- ✅ 챌린지 가입 시 입회비 동적 계산 성공
-- ✅ 보증금 락 처리 확인
-
----
-
-### Phase 3: 장부/분석 + 투표/모임 (Day 12-16) - 1/18~1/22
-
-**목표:** Django 분석 + 정기 모임 투표 시스템
-
-**Backend (Spring Boot):**
-- [ ] 장부 CRUD API
-- [ ] **정기 모임 투표 API** (신규)
-  - POST /api/challenges/{id}/meetings/vote
-  - 투표 타입: MEETING_ATTENDANCE
-- [ ] **정기 모임 CRUD API** (신규)
-  - POST /api/meetings/{id}/attend
-- [ ] **지출 투표 API**
-  - POST /api/votes (type=EXPENSE)
-  - POST /api/votes/{id}/cast
-  - GET /api/votes/{id}/result
-- [ ] 투표 승인 시 자동 처리
-  - MEETING_ATTENDANCE 승인 → MEETINGS 생성
-  - EXPENSE 승인 → 장부 기록
-- [ ] Django 분석 요청 라우팅
-
-**Backend (Django):**
-- [ ] POST /api/analyze/monthly-stats (pandas)
-- [ ] POST /api/analyze/category-ratio
-- [ ] POST /api/analyze/trend
-- [ ] Spring Boot로부터 JSON 데이터 수신
-
-**Frontend:**
-- [ ] Recharts Line Chart (v0.dev)
-- [ ] Recharts Pie Chart
-- [ ] Django 분석 결과 카드 UI
-- [ ] **정기 모임 투표 폼** (신규)
-- [ ] **모임 참석 등록 UI**
-- [ ] 지출 투표 UI
-
-**Checkpoint (1/22):**
-- ✅ Django 분석 결과 3초 이내 표시
-- ✅ 정기 모임 개최 투표 → 승인 → MEETINGS 생성 작동
-- ✅ 지출 투표 → 승인 → 장부 기록 작동
-
----
-
-### Phase 4: 검색/추천 (Day 17-19) - 1/23~1/25
-
-**목표:** Elasticsearch 검색 + Django 추천 알고리즘
-
-**Backend (Django):**
-- [ ] Spring Boot 데이터 → ES 인덱싱
-  - 챌린지 데이터 인덱싱
-  - 사용자 데이터 인덱싱
-  - 피드 데이터 인덱싱
-- [ ] GET /api/search/challenges?q= (한글 검색)
-- [ ] GET /api/search/users?q=
-- [ ] GET /api/search/feeds?q=
-- [ ] GET /api/recommendations/challenges
-  - 협업 필터링 (pandas)
-  - Elasticsearch Vector Similarity
-  - 하이브리드 점수 계산
-
-**Frontend:**
-- [ ] 검색 바 컴포넌트 (v0.dev)
-- [ ] 검색 결과 페이지
-- [ ] 추천 섹션 UI ("회원님을 위한 추천")
-
-**Checkpoint (1/25):**
-- ✅ 한글 검색 즉시 응답 (<1초)
-- ✅ 추천 챌린지 Top 10 표시
-
----
-
-### Phase 5: 통합 테스트 (Day 20-32) - 1/26~2/7
-
-**목표:** 시연 시나리오 안정화
-
-**테스트 항목:**
-- [ ] 시연 시나리오 10회 반복 실행
-- [ ] 크리티컬 버그 제로 달성
-- [ ] 에러 핸들링 (Toast 메시지)
-- [ ] 로딩 스피너 추가
-- [ ] 반응형 테스트 (Mobile + Desktop)
-- [ ] Django-Spring 통신 안정성
-- [ ] Elasticsearch 쿼리 성능 (<1초)
-
-**Checkpoint (2/7):**
-- ✅ 시연 시나리오 성공률 100%
-- ✅ 모든 API 응답 < 3초
-
----
-
-### Phase 6: 시연 리허설 (Day 33-49) - 2/8~2/25
-
-**목표:** 완벽한 시연 준비
-
-**할 일:**
-- [ ] 시연 대본 작성 (6분)
-- [ ] 시연 리허설 20회 이상
-- [ ] Mobile + Desktop 듀얼 시연 테스트
-- [ ] PPT 발표 자료 준비
-- [ ] 백업 시연 영상 녹화
-- [ ] 예상 질문 답변 준비
-  - "입회비는 어떻게 계산하나요?"
-  - "왜 Django와 Elasticsearch를 추가했나요?"
-  - "AI 도구로 어떻게 67% 단축했나요?"
-
-**2월 25일 D-Day:**
-- [ ] 오전: 최종 점검
-- [ ] 오후: 🚀 **DEMO DAY**
+📅 **상세 일정은 [SCHEDULE.md](../../SCHEDULE.md) 참조**
 
 ---
 
