@@ -1,8 +1,20 @@
 # WOORIDO 유스케이스 명세서 (Use Cases)
 
 **작성일**: 2026-01-09
-**버전**: v3.0 - ERD 기반 통합 유스케이스
+**버전**: v3.1 - 도메인별 분배 완료
 **목적**: 데이터베이스 스키마 기반 사용자 시나리오 정의
+
+> [!IMPORTANT]
+> **도메인별 문서 분배 완료 (2026-01-09)**
+> 
+> 이 문서는 도메인별로 분배되었습니다. 최신 내용은 아래 문서들을 참조하세요:
+> - [00_USE_CASES_OVERVIEW.md](./UseCases/00_USE_CASES_OVERVIEW.md) - 개요, 액터 정의, 매트릭스
+> - [01_USE_CASE_USER.md](./UseCases/01_USE_CASE_USER.md) - 사용자 도메인
+> - [02_USE_CASE_CHALLENGE.md](./UseCases/02_USE_CASE_CHALLENGE.md) - 챌린지 도메인
+> - [03_USE_CASE_MEETING.md](./UseCases/03_USE_CASE_MEETING.md) - 정기 모임 도메인
+> - [04_USE_CASE_SNS.md](./UseCases/04_USE_CASE_SNS.md) - SNS 도메인
+> - [05_USE_CASE_SYSTEM.md](./UseCases/05_USE_CASE_SYSTEM.md) - 시스템 도메인
+> - [06_USE_CASE_ADMIN.md](./UseCases/06_USE_CASE_ADMIN.md) - 관리자 도메인
 
 > 📖 정책 기준: [POLICY_DEFINITION.md](../Product/POLICY_DEFINITION.md)
 > 📋 프로덕트 아젠다: [PRODUCT_AGENDA.md](../Product/PRODUCT_AGENDA.md)
