@@ -2,7 +2,7 @@
 WOORIDO Database Schema Document (Oracle)
 ================================================================================
 
-Version         : 1.1.1
+Version         : 1.0.0
 Last Updated    : 2026-01-13
 Database        : Oracle 21c XE
 ORM             : MyBatis 3.0.3
