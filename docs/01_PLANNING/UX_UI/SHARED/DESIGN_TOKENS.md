@@ -1,30 +1,63 @@
-# WOORIDO 디자인 토큰 v1.0
+# WOORIDO 디자인 토큰 v1.2
 
 > **Purpose:** 플랫폼 공통 디자인 시스템
-> **Last Updated:** 2026-01-08
+> **Last Updated:** 2026-01-14
+> **Brand Assets:** [자산 5@4x.png](../../../자료%20모음/4x/자산%205@4x.png)
+> **Color Scheme:** Tone-on-Tone (주황 계열 통일)
 
 ---
 
 ## 1. 색상 (Colors)
 
-### 1.1 브랜드 색상
+### 1.1 브랜드 색상 ⭐ 톤온톤 스킴
+
+> 🧡 **컨셉**: WooriDo 주황색 하나로 통일 → 미니멀 & 프리미엄
+
+| 토큰 | HEX | RGB | 용도 |
+|------|-----|-----|------|
+| `--color-primary` | #E85A2C | rgb(232, 90, 44) | 메인 CTA, 로고 OO/DO |
+| `--color-primary-light` | #F07850 | rgb(240, 120, 80) | 호버 상태 |
+| `--color-primary-dark` | #C94A20 | rgb(201, 74, 32) | 액티브/클릭 상태 |
+| `--color-success` | #D4730C | rgb(212, 115, 12) | 성공, 완료 (황금빛 주황) |
+| `--color-muted` | #B8673A | rgb(184, 103, 58) | 비활성, 보조 |
+| `--color-dark` | #1A1A1A | rgb(26, 26, 26) | 로고 W/RI, 메인 텍스트 |
+
+**톤온톤 컬러 팔레트:**
+```
+🔥 #C94A20  ← Dark (클릭)
+🧡 #E85A2C  ← Primary (메인)
+🍑 #F07850  ← Light (호버)
+🌅 #D4730C  ← Success (완료)
+🍂 #B8673A  ← Muted (비활성)
+```
+
+**버튼 상태 예시:**
+```css
+.btn-primary {
+  background: var(--color-primary);  /* #E85A2C */
+}
+.btn-primary:hover {
+  background: var(--color-primary-light);  /* #F07850 */
+}
+.btn-primary:active {
+  background: var(--color-primary-dark);  /* #C94A20 */
+}
+.btn-success {
+  background: var(--color-success);  /* #D4730C - 황금빛 */
+}
+.btn-disabled {
+  background: var(--color-muted);  /* #B8673A */
+}
+```
+
+### 1.2 시맨틱 색상 (톤온톤 보조)
 
 | 토큰 | HEX | 용도 |
 |------|-----|------|
-| `--color-primary` | #6366F1 | 메인 액션 |
-| `--color-primary-light` | #818CF8 | 호버 |
-| `--color-primary-dark` | #4F46E5 | 액티브 |
-| `--color-secondary` | #10B981 | 성공, 완료 |
-| `--color-accent` | #F59E0B | 강조, 알림 |
-
-### 1.2 시맨틱 색상
-
-| 토큰 | HEX | 용도 |
-|------|-----|------|
-| `--color-success` | #10B981 | 성공 |
-| `--color-warning` | #F59E0B | 경고 |
-| `--color-error` | #EF4444 | 에러 |
-| `--color-info` | #3B82F6 | 정보 |
+| `--color-success` | #D4730C | 성공, 완료 (황금빛) |
+| `--color-warning` | #F59E0B | 경고, 주의 |
+| `--color-error` | #EF4444 | 에러, 실패 |
+| `--color-info` | #E85A2C | 정보, 안내 (Primary 활용) |
 
 ### 1.3 중립 색상
 
@@ -44,6 +77,7 @@
 | `gray-50` | `gray-900` |
 | `gray-100` | `gray-800` |
 | `gray-900` | `gray-50` |
+| `--color-primary` | `--color-primary-light` |
 
 ---
 
