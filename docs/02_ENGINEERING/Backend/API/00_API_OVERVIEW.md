@@ -2,7 +2,7 @@
 
 > **Version:** v1.0.0
 > **Last Updated:** 2026-01-14
-> **총 API:** 88개 (Spring 79 + Django 9)
+> **총 API:** 92개 (Spring 83 + Django 9)
 > **기준 문서:** API_SCHEMA_1.0.0.md, POLICY_DEFINITION.md, DB_Schema_1.0.0.md
 
 ---
@@ -14,12 +14,12 @@
 | 01 | 인증 | [01_API_AUTH.md](./01_API_AUTH.md) | 8개 | Spring |
 | 02 | 사용자 | [02_API_USER.md](./02_API_USER.md) | 6개 | Spring |
 | 03 | 어카운트 | [03_API_ACCOUNT.md](./03_API_ACCOUNT.md) | 7개 | Spring |
-| 04 | 챌린지 | [04_API_CHALLENGE.md](./04_API_CHALLENGE.md) | 15개 | Spring |
-| 05 | 정기 모임 | [05_API_MEETING.md](./05_API_MEETING.md) | 10개 | Spring |
-| 06 | 투표 | [06_API_VOTE.md](./06_API_VOTE.md) | 8개 | Spring |
-| 07 | SNS | [07_API_SNS.md](./07_API_SNS.md) | 18개 | Spring |
-| 08 | 시스템 | [08_API_SYSTEM.md](./08_API_SYSTEM.md) | 4개 | Spring |
-| 09 | 관리자 | [09_API_ADMIN.md](./09_API_ADMIN.md) | 3개 | Spring |
+| 04 | 챌린지 | [04_API_CHALLENGE.md](./04_API_CHALLENGE.md) | 13개 | Spring |
+| 05 | 모임 | [05_API_MEETING.md](./05_API_MEETING.md) | 7개 | Spring |
+| 06 | 투표 | [06_API_VOTE.md](./06_API_VOTE.md) | 5개 | Spring |
+| 07 | SNS | [07_API_SNS.md](./07_API_SNS.md) | 17개 | Spring |
+| 08 | 시스템 | [08_API_SYSTEM.md](./08_API_SYSTEM.md) | 12개 | Spring |
+| 09 | **장부** | [09_API_LEDGER.md](./09_API_LEDGER.md) | **5개** | Spring |
 | 10 | Django | [10_API_DJANGO.md](./10_API_DJANGO.md) | 9개 | Django |
 
 ---

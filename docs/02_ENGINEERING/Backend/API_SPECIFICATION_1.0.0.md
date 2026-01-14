@@ -4,6 +4,24 @@ WOORIDO API 명세서 v1.0.0
 총 API      88개 (Spring 79 + Django 9)
 기준 문서   API_SCHEMA_1.0.0.md, POLICY_DEFINITION.md, DB_Schema_1.0.0.md
 
+---
+
+> **📁 도메인별 분리 파일 안내**
+>
+> 이 문서는 도메인별로 분리되어 `API/` 폴더에서 개별 조회 가능합니다:
+> - [00_API_OVERVIEW.md](./API/00_API_OVERVIEW.md) - 공통 사항
+> - [01_API_AUTH.md](./API/01_API_AUTH.md) - 인증 (8개)
+> - [02_API_USER.md](./API/02_API_USER.md) - 사용자 (6개)
+> - [03_API_ACCOUNT.md](./API/03_API_ACCOUNT.md) - 어카운트 (7개)
+> - [04_API_CHALLENGE.md](./API/04_API_CHALLENGE.md) - 챌린지/멤버 (13개)
+> - [05_API_MEETING.md](./API/05_API_MEETING.md) - 모임 (6개)
+> - [06_API_VOTE.md](./API/06_API_VOTE.md) - 투표 (5개)
+> - [07_API_SNS.md](./API/07_API_SNS.md) - 게시글/댓글/지출/장부 (17개)
+> - [08_API_SYSTEM.md](./API/08_API_SYSTEM.md) - 신고/알림/환불/정산 (12개)
+> - [10_API_DJANGO.md](./API/10_API_DJANGO.md) - 검색/분석/추천 (9개)
+
+---
+
 ### 1. 공통 사항
 ## 1.1 기본 정보
 Base URL        https://api.woorido.com/api/v1
