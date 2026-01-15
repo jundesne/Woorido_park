@@ -2892,6 +2892,203 @@ HTTP    코드            메시지
 403     CHALLENGE_004   모임장 권한이 필요합니다
 404     CHALLENGE_001   챌린지를 찾을 수 없습니다
 
+## 089 GET /challenges/{challengeId}/ledger/summary
+장부 요약
+기본 정보
+우선순위    P1
+인증        필요 (멤버)
+
+Request Syntax
+
+Copycurl -X GET "https://api.woorido.com/api/v1/challenges/1/ledger/summary?period=MONTH" \
+  -H "Authorization: Bearer {accessToken}"
+
+Query Parameters
+
+파라미터       타입      필수    기본값    설명
+─────────────  ────────  ──────  ────────  ─────────────────────────────────
+period         String    N       MONTH     WEEK | MONTH | YEAR | ALL
+
+Response 200 OK
+
+Copy{
+  "success": true,
+  "data": {
+    "challengeId": 1,
+    "period": "MONTH",
+    "periodRange": {
+      "start": "2026-01-01",
+      "end": "2026-01-31"
+    },
+    "balance": {
+      "current": 850000,
+      "lockedDeposit": 200000,
+      "available": 650000
+    },
+    "summary": {
+      "totalIncome": 1000000,
+      "totalExpense": 150000,
+      "netAmount": 850000
+    },
+    "breakdown": {
+      "income": {
+        "support": 900000,
+        "entryFee": 100000,
+        "other": 0
+      },
+      "expense": {
+        "meeting": 80000,
+        "food": 50000,
+        "supplies": 20000,
+        "other": 0
+      }
+    },
+    "memberStats": {
+      "paidCount": 9,
+      "unpaidCount": 1,
+      "totalMembers": 10,
+      "paymentRate": 90.0
+    },
+    "trends": {
+      "incomeChange": 5.5,
+      "expenseChange": -2.3
+    }
+  },
+  "timestamp": "2026-01-14T10:30:00Z"
+}
+
+Errors
+
+HTTP    코드            메시지
+──────  ──────────────  ─────────────────────────────────
+403     CHALLENGE_003   챌린지 멤버가 아닙니다
+404     CHALLENGE_001   챌린지를 찾을 수 없습니다
+
+## 090 POST /challenges/{challengeId}/ledger
+장부 등록
+기본 정보
+우선순위    P1
+인증        필요 (리더)
+
+Request Syntax
+
+Copycurl -X POST https://api.woorido.com/api/v1/challenges/1/ledger \
+  -H "Authorization: Bearer {accessToken}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "type": "EXPENSE",
+    "category": "MEETING",
+    "amount": 50000,
+    "description": "2월 모임 장소 대여비",
+    "transactionDate": "2026-02-15"
+  }'
+
+Request Body
+
+필드             타입      필수    제약조건                          설명
+───────────────  ────────  ──────  ──────────────────────────────    ─────────────
+type             String    Y       INCOME|EXPENSE                    장부 유형
+category         String    Y       LedgerCategory                    카테고리
+amount           Long      Y       1원 이상                          금액
+description      String    Y       최대 200자                        설명
+transactionDate  String    N       YYYY-MM-DD                        거래일 (미입력 시 오늘)
+
+Response 201 Created
+
+Copy{
+  "success": true,
+  "data": {
+    "entryId": 51,
+    "type": "EXPENSE",
+    "category": "MEETING",
+    "amount": 50000,
+    "description": "2월 모임 장소 대여비",
+    "newBalance": 800000,
+    "createdBy": {
+      "userId": 1,
+      "nickname": "홍길동"
+    },
+    "createdAt": "2026-01-14T10:30:00Z"
+  },
+  "message": "장부가 등록되었습니다",
+  "timestamp": "2026-01-14T10:30:00Z"
+}
+
+Errors
+
+HTTP    코드            메시지
+──────  ──────────────  ─────────────────────────────────
+400     LEDGER_001      금액은 1원 이상이어야 합니다
+400     LEDGER_002      챌린지 잔액이 부족합니다 (지출 시)
+403     CHALLENGE_004   리더만 장부를 등록할 수 있습니다
+404     CHALLENGE_001   챌린지를 찾을 수 없습니다
+
+## 091 PUT /ledger/{entryId}
+장부 수정
+기본 정보
+우선순위    P1
+인증        필요 (리더)
+
+Path Parameters
+
+파라미터       타입      필수    설명
+─────────────  ────────  ──────  ─────────────
+entryId        Long      Y       장부 항목 ID
+
+Request Syntax
+
+Copycurl -X PUT https://api.woorido.com/api/v1/ledger/51 \
+  -H "Authorization: Bearer {accessToken}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "category": "FOOD",
+    "amount": 45000,
+    "description": "2월 모임 다과비 (수정)"
+  }'
+
+Request Body
+
+필드             타입      필수    제약조건                          설명
+───────────────  ────────  ──────  ──────────────────────────────    ─────────────
+category         String    N       LedgerCategory                    카테고리
+amount           Long      N       1원 이상                          금액
+description      String    N       최대 200자                        설명
+transactionDate  String    N       YYYY-MM-DD                        거래일
+
+Response 200 OK
+
+Copy{
+  "success": true,
+  "data": {
+    "entryId": 51,
+    "type": "EXPENSE",
+    "category": "FOOD",
+    "amount": 45000,
+    "description": "2월 모임 다과비 (수정)",
+    "previousAmount": 50000,
+    "amountDiff": -5000,
+    "newBalance": 805000,
+    "updatedBy": {
+      "userId": 1,
+      "nickname": "홍길동"
+    },
+    "updatedAt": "2026-01-14T11:00:00Z"
+  },
+  "message": "장부가 수정되었습니다",
+  "timestamp": "2026-01-14T11:00:00Z"
+}
+
+Errors
+
+HTTP    코드            메시지
+──────  ──────────────  ─────────────────────────────────
+400     LEDGER_001      금액은 1원 이상이어야 합니다
+400     LEDGER_002      챌린지 잔액이 부족합니다
+400     LEDGER_003      정산 완료된 항목은 수정할 수 없습니다
+403     CHALLENGE_004   리더만 장부를 수정할 수 있습니다
+404     LEDGER_004      장부 항목을 찾을 수 없습니다
+
+
 ### 10. POST (9개)
 ## 054 GET /challenges/{challengeId}/posts
 게시글 목록 조회
