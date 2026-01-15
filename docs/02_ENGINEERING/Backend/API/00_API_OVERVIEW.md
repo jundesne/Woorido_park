@@ -114,6 +114,9 @@
 - **Access Token 만료:** 1시간
 - **Refresh Token 만료:** 14일
 - **헤더 형식:** `Authorization: Bearer {accessToken}`
+- **사용자 권한 (Roles):**
+  - `ROLE_USER`: 일반 사용자 (토큰 발급 시 기본)
+  - `ROLE_ADMIN`: 시스템 관리자 (정산/환불 처리 권한)
 
 ### 3.2 비밀번호 정책
 - **최소/최대 길이:** 8-20자

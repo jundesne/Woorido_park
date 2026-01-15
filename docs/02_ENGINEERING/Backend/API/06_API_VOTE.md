@@ -188,6 +188,7 @@ curl -X POST https://api.woorido.com/api/v1/challenges/1/votes \
 | title | String | Y | 최대 100자 | 투표 제목 |
 | description | String | N | 최대 500자 | 투표 설명 |
 | targetId | Long | N | - | 대상 ID (지출ID/멤버ID) |
+| meetingId | Long | N | - | 모임 ID (지출 승인 시 모임 연동) |
 | deadline | String | Y | ISO 8601, 최소 24시간 후 | 마감 시간 |
 
 #### VoteType Enum
@@ -197,6 +198,20 @@ curl -X POST https://api.woorido.com/api/v1/challenges/1/votes \
 | KICK | 멤버 강퇴 투표 | memberId |
 | LEADER_KICK | 리더 강퇴 투표 | leaderId (팔로워만 투표) |
 | DISSOLVE | 챌린지 해산 투표 | 없음 |
+| MEETING_ATTENDANCE | 모임 참석/개최 투표 (P-039) | meetingId |
+
+### 비즈니스 규칙
+**승인 조건 (Approval Thresholds)**
+- **EXPENSE (지출)**: 투표 참여자의 과반수 (50% + 1)
+- **MEETING_ATTENDANCE (모임 개최)**: 전체 멤버의 과반수 (50% + 1)
+- **KICK / LEADER_KICK (강퇴)**: 전체 멤버(대상자 제외)의 70% 이상
+- **DISSOLVE (해산)**: 전체 멤버의 100% (전원 동의)
+- **MEETING_EXPENSE (모임 지출)**: 모임 참석자의 과반수 (P-042)
+
+**권한 규칙 (Permission Rules)**
+- **EXPENSE / DISSOLVE / MEETING_ATTENDANCE**: 리더만 생성 가능 (PM-007, PM-009)
+- **LEADER_KICK**: 팔로워만 생성 가능 (30일 미활동 시, PM-020)
+- **KICK**: 모든 멤버 생성 가능 (대상자 제외, PM-014)
 
 ### Response
 

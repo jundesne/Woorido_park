@@ -137,7 +137,7 @@ curl -X GET "https://api.woorido.com/api/v1/challenges?status=RECRUITING&page=0&
 #### Query Parameters
 | 파라미터 | 타입 | 필수 | 기본값 | 설명 |
 |----------|------|------|--------|------|
-| status | String | N | - | RECRUITING / ACTIVE / CLOSED |
+| status | String | N | - | RECRUITING / ACTIVE / PAUSED / CLOSED |
 | category | String | N | - | 카테고리 필터 |
 | sort | String | N | createdAt,desc | 정렬 기준 |
 | page | Integer | N | 0 | 페이지 번호 |
@@ -550,6 +550,7 @@ curl -X PUT https://api.woorido.com/api/v1/challenges/1/support/settings \
 | 입회비 계산 | balance / (memberCount - 1) |
 | 첫 서포트 | 납입일 7일 전 이내 가입 시 첫 달 서포트 포함 |
 | 당도 제한 | 당도(Brix)가 음수인 사용자는 가입 불가 |
+| 상태 전환 | 멤버 수 3명 도달 시 자동으로 ACTIVE(진행 중) 상태로 전환 (P-047) |
 
 ### Errors
 | HTTP | 코드 | 메시지 |
