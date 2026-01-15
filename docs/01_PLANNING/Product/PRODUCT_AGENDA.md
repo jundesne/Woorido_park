@@ -1,7 +1,7 @@
 # WOORIDO 프로덕트 아젠다 (Product Agenda)
 
 > **Project:** WOORIDO - 커뮤니티 기반 챌린지 플랫폼 (구 계모임 플랫폼)
-> **Last Updated:** 2026-01-09
+> **Last Updated:** 2026-01-15
 >
 > 📅 개발 일정 및 Demo Day 정보: [SCHEDULE.md](../../SCHEDULE.md)
 > 📋 변경 이력: [BACKLOG.md](../../BACKLOG.md)
@@ -599,7 +599,7 @@ Django → Spring Boot → Frontend (차트 데이터)
 | **5** | **투표 시스템 + 정기 모임** | 8개 | 7일 | 2.5일 | 64% |
 | **6** | **검색 (Elasticsearch)** | 3개 | 5일 | 1.5일 | 70% |
 | **7** | **추천 (Django + ES)** | 2개 | - | 2일 | New |
-| | **총 API** | **51개** | **57일** | **19일** | **67%** |
+| | **총 API** | **91개** | **57일** | **19일** | **67%** |
 
 ### 정기 모임 (Meetings) 기능
 

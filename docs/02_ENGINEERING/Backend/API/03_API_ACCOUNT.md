@@ -195,12 +195,19 @@ curl -X POST https://api.woorido.com/api/v1/accounts/charge \
   "data": {
     "orderId": "ORD20260114103000001",
     "amount": 100000,
+    "fee": 3000,
+    "totalPaymentAmount": 103000,
     "paymentUrl": "https://pay.woorido.com/checkout/ORD20260114103000001",
     "expiresAt": "2026-01-14T10:45:00Z"
   },
-  "message": "결제 페이지로 이동해주세요",
+  "message": "수수료 포함 103,000원 결제 페이지로 이동합니다",
   "timestamp": "2026-01-14T10:30:00Z"
 }
+```
+
+### 수수료 정책 (P-011)
+- 10,000 ~ 200,000원: 3% 부과
+- 예: 100,000원 충전 시 103,000원 결제
 ```
 
 ### Errors
@@ -298,8 +305,8 @@ curl -X POST https://api.woorido.com/api/v1/accounts/withdraw \
   "data": {
     "withdrawId": 1,
     "amount": 100000,
-    "fee": 3000,
-    "netAmount": 97000,
+    "fee": 0,
+    "netAmount": 100000,
     "newBalance": 400000,
     "bankInfo": {
       "bankCode": "088",
@@ -314,12 +321,8 @@ curl -X POST https://api.woorido.com/api/v1/accounts/withdraw \
 }
 ```
 
-### 수수료 계산 (P-007)
-| 금액 범위 | 수수료율 |
-|-----------|----------|
-| 9,999원 이하 | 1% |
-| 10,000 ~ 200,000원 | 3% |
-| 200,001원 이상 | 1.5% |
+### 수수료 정보
+- 출금 수수료 무료 (충전 시 부과됨)
 
 ### Errors
 | HTTP | 코드 | 메시지 |
@@ -409,6 +412,11 @@ curl -X GET https://api.woorido.com/api/v1/accounts/fee-policy \
   "success": true,
   "data": {
     "withdrawFee": {
+      "rate": 0,
+      "minAmount": 0,
+      "maxAmount": null
+    },
+    "chargeFee": {
       "tiers": [
         {
           "name": "소액",
@@ -429,11 +437,6 @@ curl -X GET https://api.woorido.com/api/v1/accounts/fee-policy \
           "rate": 1.5
         }
       ]
-    },
-    "chargeFee": {
-      "rate": 0,
-      "minAmount": 10000,
-      "unit": 10000
     },
     "updatedAt": "2026-01-01T00:00:00Z"
   },
